@@ -25,6 +25,8 @@ const App = () => {
   // Förtöjning & Båt
   const [sternRopeLengthCm, setSternRopeLengthCm] = useState(200);   
   const [sternChainLengthCm, setSternChainLengthCm] = useState(500); 
+  const [sternTotalLengthCm, setSternTotalLengthCm] = useState(700);
+  const [sternChainPercent, setSternChainPercent] = useState(71); 
   const [bowRopeLengthCm, setBowRopeLengthCm] = useState(120); 
   const [anchorPositionXCm, setAnchorPositionXCm] = useState(1200);
   const [boatLengthCm, setBoatLengthCm] = useState(500); 
@@ -56,8 +58,8 @@ const App = () => {
       windSpeed: "Vindstyrka (Bas)",
       fromDock: "FRÅN BRYGGA",
       fromSea: "FRÅN HAVET",
-      ropeLength: "Tamplängd (Blå)",
-      chainLength: "Kättinglängd (Svart)",
+      totalSternLength: "Total akterförtöjning",
+      chainPercent: "Kättingandel %",
       thickness: "Godstjocklek",
       anchorPos: "Ankarposition (X)",
       bowLine: "Förtamp",
@@ -83,8 +85,8 @@ const App = () => {
       windSpeed: "Wind Speed (Waves)",
       fromDock: "FROM DOCK",
       fromSea: "FROM SEA",
-      ropeLength: "Rope Length (Blue)",
-      chainLength: "Chain Length (Black)",
+      totalSternLength: "Total Stern Length",
+      chainPercent: "Chain Percentage %",
       thickness: "Chain Thickness",
       anchorPos: "Anchor Pos (X)",
       bowLine: "Bow Line",
@@ -191,8 +193,11 @@ const App = () => {
     setSeabedDepthCm(100);
     setDockHeightCm(200);
     setWaveHeightCm(10);
-    setSternRopeLengthCm(200);
-    setSternChainLengthCm(500);
+    setWaveHeightCm(10);
+    setSternTotalLengthCm(700);
+    setSternChainPercent(71);
+    setSternRopeLengthCm(203);
+    setSternChainLengthCm(497);
     setBowRopeLengthCm(120);
     setAnchorPositionXCm(1200);
     setBoatLengthCm(500);
@@ -776,10 +781,26 @@ const App = () => {
           </div>
 
           <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3 text-left">
-            <div><label className="flex justify-between mb-1 uppercase font-bold text-blue-400">{txt.ropeLength} <span className="font-mono">{sternRopeLengthCm} cm</span></label>
-            <input type="range" min="0" max="1500" value={sternRopeLengthCm} onChange={(e) => setSternRopeLengthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-blue-600" disabled={isSunk} /></div>
-            <div><label className="flex justify-between mb-1 uppercase font-bold text-slate-100">{txt.chainLength} <span className="font-mono">{sternChainLengthCm} cm</span></label>
-            <input type="range" min="0" max="2000" value={sternChainLengthCm} onChange={(e) => setSternChainLengthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-slate-400" disabled={isSunk} /></div>
+            <div>
+              <label className="flex justify-between mb-1 uppercase font-bold text-blue-400">{txt.totalSternLength} <span className="font-mono">{sternTotalLengthCm} cm</span></label>
+              <input type="range" min="0" max="3000" value={sternTotalLengthCm} onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setSternTotalLengthCm(val);
+                const chainLen = Math.round(val * (sternChainPercent / 100));
+                setSternChainLengthCm(chainLen);
+                setSternRopeLengthCm(val - chainLen);
+              }} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-blue-600" disabled={isSunk} />
+            </div>
+            <div>
+              <label className="flex justify-between mb-1 uppercase font-bold text-slate-100">{txt.chainPercent} <span className="font-mono">{sternChainPercent}%</span></label>
+              <input type="range" min="0" max="100" value={sternChainPercent} onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setSternChainPercent(val);
+                const chainLen = Math.round(sternTotalLengthCm * (val / 100));
+                setSternChainLengthCm(chainLen);
+                setSternRopeLengthCm(sternTotalLengthCm - chainLen);
+              }} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-slate-400" disabled={isSunk} />
+            </div>
             <div className="pt-2 border-t border-white/5"><label className="flex justify-between mb-2 uppercase font-bold text-emerald-400">{txt.thickness} <span className="font-mono">{chainThickness} mm</span></label>
             <input type="range" min="6" max="16" step="1" value={chainThickness} onChange={(e) => setChainThickness(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
             <div><label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.anchorPos} <span className="font-mono">{anchorPositionXCm} cm</span></label>

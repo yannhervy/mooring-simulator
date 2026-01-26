@@ -779,7 +779,7 @@ const App = () => {
              const sTautReal = sternRatio > 0.98;
              const fTautReal = (distF / r.bowRopeLengthCm) > 0.98;
 
-             if ((sTautReal && r.windDir === -1) || (fTautReal && r.windDir === 1)) {
+             if ((sTautReal && r.windDir === -1) || (fTautReal && sTautReal)) {
                  bState = 'stressed';
              }
         }
@@ -969,7 +969,7 @@ const App = () => {
               for (let y = seaY; y > 0; y -= 100) { ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(25, y); ctx.stroke(); ctx.fillText(`${Math.round(seaY-y)/100}m`, 15, y+4); }
               ctx.fillStyle = '#0ea5e9'; ctx.beginPath(); ctx.moveTo(40, curY); ctx.lineTo(32, curY - 5); ctx.lineTo(32, curY + 5); ctx.fill();
               drawHorizontalRuler(ctx, seaY, dockX);
-              ctx.fillStyle = '#10b981'; ctx.textAlign = 'center'; ctx.fillText(`ANKAR`, anchorX, seaY + 40);
+              ctx.fillStyle = '#10b981'; ctx.textAlign = 'center'; ctx.fillText(`ANCHOR`, anchorX, seaY + 40);
               ctx.restore();
           }},
           { id: 'hud', draw: () => {

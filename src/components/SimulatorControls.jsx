@@ -221,23 +221,7 @@ const SimulatorControls = ({
             </div>
           </div>
 
-          {/* Boat Type Presets */}
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left mb-2">
-              <label className="text-[9px] uppercase font-bold text-purple-300 mb-1 block">{txt.boatTypeLabel}</label>
-              <div className="flex gap-1">
-                  <button onClick={() => setBoatLengthCm(450)} className="flex-1 py-1 bg-slate-800 border border-slate-600 rounded text-[9px] text-purple-200 hover:bg-slate-700">{txt.boatTypes.small}</button>
-                  <button onClick={() => setBoatLengthCm(600)} className="flex-1 py-1 bg-slate-800 border border-slate-600 rounded text-[9px] text-purple-200 hover:bg-slate-700">{txt.boatTypes.medium}</button>
-                  <button onClick={() => setBoatLengthCm(1000)} className="flex-1 py-1 bg-slate-800 border border-slate-600 rounded text-[9px] text-purple-200 hover:bg-slate-700">{txt.boatTypes.large}</button>
-              </div>
-          </div>
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left">
-            <label className="flex justify-between mb-1 uppercase font-bold text-purple-400">{txt.boatLength} <span className="font-mono">{boatLengthCm} cm</span></label>
-            <div className="flex items-center gap-2">
-              <button onClick={() => !isSunk && setBoatLengthCm(Math.max(300, boatLengthCm - 10))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-purple-400 font-bold disabled:opacity-50" disabled={isSunk}>-</button>
-              <input type="range" min="300" max="1200" value={boatLengthCm} onChange={(e) => setBoatLengthCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-purple-400" disabled={isSunk} />
-              <button onClick={() => !isSunk && setBoatLengthCm(Math.min(1200, boatLengthCm + 10))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-purple-400 font-bold disabled:opacity-50" disabled={isSunk}>+</button>
-            </div>
-          </div>
+
         </div>
       </div>
     </>

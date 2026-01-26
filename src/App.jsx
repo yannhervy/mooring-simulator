@@ -28,7 +28,7 @@ const App = () => {
   // --- CONFIGURATION ---
   // Ändra dessa värden för att ställa in default-läget
   const CONFIG = {
-      defaultSternTotal: 750,
+      defaultSternTotal: 720,
       defaultChainPercent: 70
   };
 
@@ -47,8 +47,8 @@ const App = () => {
   const [anchorPositionXCm, setAnchorPositionXCm] = useState(1000);
   const [boatLengthCm, setBoatLengthCm] = useState(300); 
   
-  const [windSpeedMs, setWindSpeedMs] = useState(5); 
-  const [windDirection, setWindDirection] = useState(-1); 
+  const [windSpeedMs, setWindSpeedMs] = useState(15); 
+  const [windDirection, setWindDirection] = useState(1); 
   const [chainThickness, setChainThickness] = useState(10); 
   
   const [weatherMode, setWeatherMode] = useState('OFF');
@@ -82,7 +82,7 @@ const App = () => {
     waterLevelCm: 0, seabedDepthCm: 100, dockHeightCm: 200, waveHeightCm: 10, 
     sternChainLengthCm: 400, sternRopeLengthCm: 400, bowRopeLengthCm: 120, anchorPositionXCm: 600, 
     boatLengthCm: 500,
-    windSpeedMs: 5, windDir: -1, thickness: 10, 
+    windSpeedMs: 15, windDir: 1, thickness: 10, 
     boatX: 0, sinkingY: 0, isSunk: false, isColliding: false, wavePhase: 0,
     lang: 'sv', isFloatingDock: false,
     debugData: { sternDist: 0, sternMax: 0, frontDist: 0, frontMax: 0 }
@@ -161,8 +161,8 @@ const App = () => {
     setBowRopeLengthCm(120);
     setAnchorPositionXCm(1200);
     setBoatLengthCm(300);
-    setWindSpeedMs(5);
-    setWindDirection(-1);
+    setWindSpeedMs(15);
+    setWindDirection(1);
     setChainThickness(10);
     setWeatherMode('OFF');
 

@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import SimulatorControls from './components/SimulatorControls';
+import { translations as t } from './translations';
 
 /**
  * Stegerholmens Småbåtshamn - Simulator v10.4 (Skala 1px = 1cm).
@@ -22,15 +24,28 @@ const App = () => {
   const [dockHeightCm, setDockHeightCm] = useState(200); 
   const [isFloatingDock, setIsFloatingDock] = useState(false);
 
-  // Förtöjning & Båt
-  const [sternRopeLengthCm, setSternRopeLengthCm] = useState(200);   
-  const [sternChainLengthCm, setSternChainLengthCm] = useState(500); 
-  const [sternTotalLengthCm, setSternTotalLengthCm] = useState(700);
-  const [sternChainPercent, setSternChainPercent] = useState(71); 
-  const [bowRopeLengthCm, setBowRopeLengthCm] = useState(120); 
-  const [anchorPositionXCm, setAnchorPositionXCm] = useState(1200);
-  const [boatLengthCm, setBoatLengthCm] = useState(500); 
+  // --- CONFIGURATION ---
+  // Ändra dessa värden för att ställa in default-läget
+  const CONFIG = {
+      defaultSternTotal: 750,
+      defaultChainPercent: 70
+  };
 
+  const calcChain = (total, percent) => Math.round(total * (percent / 100));
+  const calcRope = (total, chain) => total - chain;
+
+  const initChain = calcChain(CONFIG.defaultSternTotal, CONFIG.defaultChainPercent);
+  const initRope = calcRope(CONFIG.defaultSternTotal, initChain);
+
+  // Förtöjning & Båt
+  const [sternTotalLengthCm, setSternTotalLengthCm] = useState(CONFIG.defaultSternTotal);
+  const [sternChainPercent, setSternChainPercent] = useState(CONFIG.defaultChainPercent);
+  const [sternChainLengthCm, setSternChainLengthCm] = useState(initChain); 
+  const [sternRopeLengthCm, setSternRopeLengthCm] = useState(initRope); 
+  const [bowRopeLengthCm, setBowRopeLengthCm] = useState(120); 
+  const [anchorPositionXCm, setAnchorPositionXCm] = useState(1000);
+  const [boatLengthCm, setBoatLengthCm] = useState(300); 
+  
   const [windSpeedMs, setWindSpeedMs] = useState(5); 
   const [windDirection, setWindDirection] = useState(-1); 
   const [chainThickness, setChainThickness] = useState(10); 
@@ -40,65 +55,8 @@ const App = () => {
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-  const calculateWeight = (d) => 0.0225 * Math.pow(d, 2);
+  const calculateWeight = (d) => 0.0050 * Math.pow(d, 2);
   const ROPE_WEIGHT_PER_M = 0.5;
-
-  const t = {
-    sv: {
-      title: "Stegerholmens Hamnkontroll",
-      mainTitle: "Stegerholmens Småbåtshamn",
-      weatherLabel: "VÄDERLEK",
-      modes: { OFF: 'AV', NORMAL: 'NORMAL', EXTREME: 'EXTREM' },
-      waterLevel: "Vattennivå",
-      depth: "Djup (Sjöbotten)",
-      dockHeight: "Brygghöjd (från botten)",
-      floatingDock: "Flytbrygga",
-      boatLength: "Båtlängd",
-      waveHeight: "Våghöjd",
-      windSpeed: "Vindstyrka (Bas)",
-      fromDock: "FRÅN BRYGGA",
-      fromSea: "FRÅN HAVET",
-      totalSternLength: "Total akterförtöjning",
-      chainPercent: "Kättingandel %",
-      thickness: "Godstjocklek",
-      anchorPos: "Ankarposition (X)",
-      bowLine: "Förtamp",
-      hudWind: "Vind",
-      hudWater: "Vatten",
-      hudWaves: "Vågor",
-      hudDock: "Brygga",
-      debugTitle: "DEBUG: FÖRTÖJNINGSDATA",
-      debugStern: "AKTER",
-      debugBow: "FÖR"
-    },
-    en: {
-      title: "Stegerholmen Harbor Control",
-      mainTitle: "Stegerholmen Marina",
-      weatherLabel: "WEATHER",
-      modes: { OFF: 'OFF', NORMAL: 'NORMAL', EXTREME: 'EXTREME' },
-      waterLevel: "Water Level",
-      depth: "Depth (Seabed)",
-      dockHeight: "Dock Height (from seabed)",
-      floatingDock: "Floating Dock",
-      boatLength: "Boat Length",
-      waveHeight: "Wave Height",
-      windSpeed: "Wind Speed (Waves)",
-      fromDock: "FROM DOCK",
-      fromSea: "FROM SEA",
-      totalSternLength: "Total Stern Length",
-      chainPercent: "Chain Percentage %",
-      thickness: "Chain Thickness",
-      anchorPos: "Anchor Pos (X)",
-      bowLine: "Bow Line",
-      hudWind: "Wind",
-      hudWater: "Water",
-      hudWaves: "Waves",
-      hudDock: "Dock",
-      debugTitle: "DEBUG: MOORING DATA",
-      debugStern: "STERN",
-      debugBow: "BOW"
-    }
-  };
 
   const txt = t[language];
 
@@ -194,13 +152,14 @@ const App = () => {
     setDockHeightCm(200);
     setWaveHeightCm(10);
     setWaveHeightCm(10);
-    setSternTotalLengthCm(700);
-    setSternChainPercent(71);
-    setSternRopeLengthCm(203);
-    setSternChainLengthCm(497);
+    setWaveHeightCm(10);
+    setSternTotalLengthCm(CONFIG.defaultSternTotal);
+    setSternChainPercent(CONFIG.defaultChainPercent);
+    setSternChainLengthCm(initChain);
+    setSternRopeLengthCm(initRope);
     setBowRopeLengthCm(120);
     setAnchorPositionXCm(1200);
-    setBoatLengthCm(500);
+    setBoatLengthCm(300);
     setWindSpeedMs(5);
     setWindDirection(-1);
     setChainThickness(10);
@@ -281,8 +240,8 @@ const App = () => {
 
     const drawHorizontalRuler = (ctx, seabedY, dockX) => {
       ctx.save();
-      ctx.strokeStyle = 'rgba(15, 23, 42, 0.3)'; ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-      ctx.lineWidth = 1; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.3)'; ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.lineWidth = 1; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
       ctx.beginPath(); ctx.moveTo(0, seabedY); ctx.lineTo(dimensions.width, seabedY); ctx.stroke();
       const startX = 0; const endX = dimensions.width;
       for (let x = startX; x <= endX; x += 10) {
@@ -322,6 +281,39 @@ const App = () => {
       ctx.restore();
     };
 
+    const drawRain = (ctx, windSpeed, windDir) => {
+      if (windSpeed < 10) return; // Regn endast vid hård vind (>10 m/s)
+      
+      const rainCount = Math.floor(windSpeed * 15); // Mer regn vid högre vind
+      const angle = (windDir * Math.PI) / 6; // Lutning på regnet
+      const length = 10 + (windSpeed * 0.5); // Längre droppar vid högre fart
+      
+      ctx.save();
+      ctx.strokeStyle = 'rgba(60, 75, 100, 0.8)';
+      ctx.lineWidth = 1;
+      
+      // Använd tid för animation
+      const offset = (time * 1000) % dimensions.height;
+      
+      for (let i = 0; i < rainCount; i++) {
+        // Pseudo-slump baserad på index så regnet ser likadant ut varje frame (men rör sig)
+        // Vi lägger till time för rörelse
+        const xSeed = (i * 1234.5678) % dimensions.width;
+        const ySeed = (i * 8765.4321) % dimensions.height;
+        
+        // Rörelse nedåt och med vinden
+        let y = (ySeed + (time * 800)) % dimensions.height;
+        let x = (xSeed + (time * windSpeed * windDir * 50)) % dimensions.width;
+        if (x < 0) x += dimensions.width;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.sin(angle) * length, y + Math.cos(angle) * length);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+
     const animate = () => {
       time += 0.02;
       const r = refs.current;
@@ -341,12 +333,14 @@ const App = () => {
       // Vindfaktor 0 (stiltje) till 1 (storm 20+ m/s)
       const windFactor = Math.min(1, Math.abs(r.windSpeedMs) / 20); 
       
-      // Himmelsfärg: Från ljusblå till mörkgrå
-      // Sky-200: 186, 230, 253 -> Slate-600: 71, 85, 105
-      const rSky = 186 - (115 * windFactor);
-      const gSky = 230 - (145 * windFactor);
-      const bSky = 253 - (148 * windFactor);
-      ctx.fillStyle = `rgb(${rSky},${gSky},${bSky})`;
+      // Himmelsfärg: Vitare/Gråare vid vind (Overcast)
+      // Sky-200: 186, 230, 253 -> Slate-300: 203, 213, 225
+      const sFactor = windFactor * 0.8; 
+      const rSky = 186 + ((203 - 186) * sFactor);
+      const gSky = 230 + ((213 - 230) * sFactor);
+      const bSky = 253 + ((225 - 253) * sFactor);
+      
+      ctx.fillStyle = `rgb(${Math.round(rSky)},${Math.round(gSky)},${Math.round(bSky)})`;
       ctx.fillRect(0,0, dimensions.width, dimensions.height); // Rita himmel
       
       const b0Y = dimensions.height * 0.6; 
@@ -356,7 +350,8 @@ const App = () => {
       // Dynamisk bryggposition för att hantera stora båtar
       // Bryggan flyttas så att den alltid är "framför" båten vid start
       const dockX = (dimensions.width / 2) + Math.max(200, r.boatLengthCm * 0.7); 
-      const anchorX = (dimensions.width / 2) - r.anchorPositionXCm;
+      // Ankaret positioneras nu relativt bryggan för att matcha linjalen (Slider 1000cm = 10m från bryggan)
+      const anchorX = dockX - r.anchorPositionXCm;
       const currentWind = r.windSpeedMs * (1 + (Math.sin(time * 0.45) * 0.35 + 0.35)) * r.windDir;
 
       let dockY;
@@ -386,6 +381,8 @@ const App = () => {
             drawCloud(ctx, c.x, c.y, c.scale, cloudColor);
         }
       });
+
+      drawRain(ctx, Math.abs(r.windSpeedMs), r.windDir);
 
       // --- LOGIK ---
       let boatXAbs, boatFinalY, totalAngle, bState;
@@ -420,33 +417,88 @@ const App = () => {
       } else {
         // --- PHYSICS UPDATE ---
         // Wind force scales with boat size (Windage) and Wind Speed ^ 1.8
-        // User requested heavier boat feeling.
-        const mass = (r.boatLengthCm * 1.6); // Mass increases linearly with length (simplified) or use length^2
-        const inertiaFactor = 1.0 / mass; 
-        
+        const mass = (r.boatLengthCm * 1.6); 
         const windageFactor = r.boatLengthCm / 50; 
         const windForce = Math.sign(currentWind) * Math.pow(Math.abs(currentWind), 1.8) * 20.0 * windageFactor;
         
-        // Resistance increases with mass/size
-        const waterResistance = (chainW * 0.8) + 10.0 + (r.boatLengthCm * 0.2); 
-        
-        // Simulating inertia: movement toward equilibrium is slower for heavier boats
-        const lerpSpeed = 0.05 * (50 / r.boatLengthCm); 
+        // Resistance (Water Drag + Chain Drag on bottom)
+        // Base resistance
+        // Create velocity state if it doesn't exist
+        if (typeof r.boatVX === 'undefined') r.boatVX = 0;
 
-        // --- Gravity / Restoring Force ---
-        // If the boat is pushed far from center (stretching ropes), gravity/tension pulls it back.
-        // Especially if it starts "climbing" (lifting out of water), gravity is huge.
-        // Simple spring/pendulum approximation:
-        const displacement = r.boatX;
-        const restoringForce = displacement * (mass * 0.005);
+        // Force Accumulator
+        let forceX = 0;
+
+        // 1. Wind Force
+        forceX += windForce;
+
+        // 2. Water Drag (Velocity based)
+        // Drag equation: Fd = -0.5 * rho * A * v*v * Cd * sign(v)
+        // Simply: Fd = -k * v * |v|
+        // Or linear drag for low speeds: Fd = -k * v
+        const dragCoeff = 15.0 + (r.boatLengthCm * 0.1); 
+        forceX -= r.boatVX * dragCoeff; 
+
+        // 3. Chain Drag (if moving and chain is slack)
+        // If extension is low, we assume chain is dragging on seabed -> higher friction
+        // We use the previously calculated extensionRatio or distToAnchor
+        const currentBoatXAbs = (dimensions.width / 2) + r.boatX;
+        const currentSternX = currentBoatXAbs - halfL;
+        const currentBowX = currentBoatXAbs + halfL;
+        const maxSternReach = r.sternChainLengthCm + r.sternRopeLengthCm;
+        const physDxS = Math.abs(currentSternX - anchorX);
+        const distToAnchor = Math.hypot(physDxS, Math.abs(seaY - (curY - deckHeightOffset)));
         
-        // Calculate target velocity/position
-        // F = Wind - Resistance - Restoring
-        // We are using position-based approximation: TargetX = (Wind - Restoring) / Resistance
-        const effectiveWindForce = windForce - restoringForce;
-        const targetX = effectiveWindForce / waterResistance;
+        let sternTensionX = 0;
+        if (maxSternReach > 0) {
+           // Clamp max extension to 0.95 to prevent infinity explosion
+           const extensionRatio = Math.min(0.95, distToAnchor / maxSternReach);
+           
+           if (extensionRatio < 0.8) {
+               // Extra drag from dragging heavy chain
+               forceX -= r.boatVX * (chainW * (1.0 - extensionRatio) * 10.0);
+           }
+
+           // Catenary Tension
+           const chainWeightTotal = (chainW * r.sternChainLengthCm) + (ROPE_WEIGHT_PER_M * r.sternRopeLengthCm);
+           const tensionForce = chainWeightTotal * (Math.pow(extensionRatio, 2) / (1 - extensionRatio)) * 4.0;
+           
+           const angle = Math.atan2(seaY - (curY - deckHeightOffset), physDxS); 
+           sternTensionX = tensionForce * Math.cos(angle);
+        }
+
+        // 4. Bow Tension
+        let bowTensionX = 0;
+        const distToDock = Math.hypot(Math.abs(currentBowX - dockX), Math.abs(dockY - (curY - deckHeightOffset)));
+        if (r.bowRopeLengthCm > 0) {
+             const bowRatio = Math.min(0.95, distToDock / r.bowRopeLengthCm);
+             if (bowRatio > 0.8) {
+                 // Spring-like for rope
+                 bowTensionX = (bowRatio / (1 - bowRatio)) * 500;
+             }
+        }
+
+        const sternForceSign = currentSternX > anchorX ? -1 : 1;
+        const bowForceSign = currentBowX < dockX ? 1 : -1;
         
-        r.boatX += (targetX - r.boatX) * lerpSpeed;
+        forceX += (sternTensionX * sternForceSign);
+        forceX += (bowTensionX * bowForceSign);
+
+        // Integration (Euler)
+        // F = ma -> a = F/m
+        const accelX = forceX / mass;
+        r.boatVX += accelX * 0.05; // dt = 0.05 (approx)
+        
+        // Velocity Damping (Artifical stability)
+        r.boatVX *= 0.98; 
+
+        // Update Position
+        r.boatX += r.boatVX;
+
+        // Visual "jitter" fix: if velocity is tiny, snap to 0 to prevent micro-oscillations
+        if (Math.abs(r.boatVX) < 0.01 && Math.abs(forceX) < 1.0) r.boatVX = 0;
+
+
 
         let tempBoatXAbs = (dimensions.width / 2) + r.boatX;
         let natY = curY + Math.sin(tempBoatXAbs * WAVE_K + r.wavePhase) * currentAmp;
@@ -608,7 +660,19 @@ const App = () => {
         }
         else if (fCritical && r.windDir === 1) bState = 'critical';
         else if (isColl) bState = 'colliding'; 
-        else if (((sTaut && r.windDir === -1) || (fTaut && r.windDir === 1))) bState = 'stressed';
+        else {
+             // Calculate true stretch ratios based o Euclidean distance
+             const sternRatio = distS / maxSternStretch;
+             
+             // Only show stress if lines are actually TIGHT (near 100% capacity)
+             // Chain needs to be fully lifted (straight) to be "taut" in this context
+             const sTautReal = sternRatio > 0.98;
+             const fTautReal = (distF / r.bowRopeLengthCm) > 0.98;
+
+             if ((sTautReal && r.windDir === -1) || (fTautReal && r.windDir === 1)) {
+                 bState = 'stressed';
+             }
+        }
 
         r.isColliding = isColl;
         r.debugData = { sternDist: distS, sternMax: maxSternStretch, frontDist: distF, frontMax: maxFrontStretch };
@@ -627,7 +691,7 @@ const App = () => {
       ctx.fillStyle = '#451a03'; ctx.fillRect(dockX, dockY - 15, 150, 25);
 
       const trans = t[r.lang] || t['sv'];
-      ctx.save(); ctx.strokeStyle = 'rgba(15, 23, 42, 0.2)'; ctx.fillStyle = 'rgba(15, 23, 42, 0.5)'; ctx.font = '10px monospace';
+      ctx.save(); ctx.strokeStyle = 'rgba(15, 23, 42, 0.2)'; ctx.fillStyle = 'rgba(15, 23, 42, 0.7)'; ctx.font = 'bold 14px monospace';
       for (let y = seaY; y > 0; y -= 100) { ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(25, y); ctx.stroke(); ctx.fillText(`${Math.round(seaY-y)/100}m`, 15, y+4); }
       ctx.fillStyle = '#0ea5e9'; ctx.beginPath(); ctx.moveTo(40, curY); ctx.lineTo(32, curY - 5); ctx.lineTo(32, curY + 5); ctx.fill();
       drawHorizontalRuler(ctx, seaY, dockX);
@@ -679,6 +743,7 @@ const App = () => {
       }
       ctx.stroke();
 
+      // Vattenfärg: Blå (14, 165, 233) -> Grönaktig (20, 184, 166) vid storm
       const wA = 0.2; ctx.fillStyle = `rgba(14, 165, 233, ${wA})`;
       [30, -20].forEach((o, idx) => {
         ctx.beginPath(); ctx.moveTo(0, dimensions.height);
@@ -729,96 +794,42 @@ const App = () => {
 
   return (
     <div ref={containerRef} className="relative flex items-center justify-center w-full h-screen bg-sky-200 overflow-hidden font-sans text-white text-center">
-      <div className="absolute top-6 right-6 z-20 bg-slate-900/95 backdrop-blur-md p-6 rounded-2xl border border-slate-700 shadow-2xl w-80 max-h-[95vh] overflow-y-auto scrollbar-hide text-left">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-4">
-          <h3 className="font-bold text-[10px] uppercase tracking-widest text-sky-400 italic">{txt.title}</h3>
-          <div className="flex gap-1">
-            <button onClick={() => setLanguage('sv')} className={`text-[9px] px-1 rounded ${language === 'sv' ? 'bg-sky-600 text-white' : 'text-slate-500'}`}>SV</button>
-            <button onClick={() => setLanguage('en')} className={`text-[9px] px-1 rounded ${language === 'en' ? 'bg-sky-600 text-white' : 'text-slate-500'}`}>EN</button>
-          </div>
-        </div>
-        
-        <div className="space-y-4 text-[11px]">
-          <div>
-            <label className="text-[9px] uppercase font-bold text-sky-300 mb-1 block">{txt.weatherLabel}</label>
-            <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-600">
-                {['OFF', 'NORMAL', 'EXTREME'].map((mode) => (
-                <button key={mode} onClick={() => setWeatherMode(mode)} className={`flex-1 py-2 rounded text-[9px] font-bold transition ${weatherMode === mode ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>{txt.modes[mode]}</button>
-                ))}
-            </div>
-          </div>
-          
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
-            <div><label className="flex justify-between mb-1 uppercase font-bold text-sky-400">{txt.waterLevel} <span className="font-mono">{waterLevelCm} cm</span></label>
-            <input type="range" min="-300" max="300" value={waterLevelCm} onChange={(e) => setWaterLevelCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-sky-500" disabled={isSunk || weatherMode !== 'OFF'} /></div>
-            <div><label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.depth} <span className="font-mono">{seabedDepthCm} cm</span></label>
-            <input type="range" min="0" max="1200" value={seabedDepthCm} onChange={(e) => setSeabedDepthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
-            
-            {/* Dock Height Slider */}
-            <div>
-              <div className="flex justify-between mb-1">
-                <label className="uppercase font-bold text-amber-500">{txt.dockHeight} <span className="font-mono">{dockHeightCm} cm</span></label>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" id="floatingDock" checked={isFloatingDock} onChange={(e) => setIsFloatingDock(e.target.checked)} className="w-3 h-3 accent-amber-500" disabled={isSunk} />
-                  <label htmlFor="floatingDock" className="text-[9px] text-amber-300 font-bold uppercase cursor-pointer">{txt.floatingDock}</label>
-                </div>
-              </div>
-              <input type="range" min="100" max="500" value={dockHeightCm} onChange={(e) => setDockHeightCm(parseInt(e.target.value))} className={`w-full h-1 rounded-lg appearance-none ${isFloatingDock ? 'bg-slate-700 cursor-not-allowed' : 'bg-slate-700 accent-amber-500'}`} disabled={isSunk || isFloatingDock} />
-            </div>
-
-            {/* Wave Height Slider */}
-            <div><label className="flex justify-between mb-1 uppercase font-bold text-slate-400">{txt.waveHeight} <span className="font-mono">{waveHeightCm} cm</span></label>
-            <input type="range" min="0" max="100" value={waveHeightCm} onChange={(e) => setWaveHeightCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-sky-500" disabled={isSunk || weatherMode !== 'OFF'} /></div>
-          </div>
-
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10">
-            <label className="flex justify-between mb-2 uppercase font-bold text-sky-300">{txt.windSpeed} <span className="font-mono">{windSpeedMs} m/s</span></label>
-            <input type="range" min="0" max="40" value={windSpeedMs} onChange={(e) => setWindSpeedMs(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-sky-400" disabled={isSunk || weatherMode !== 'OFF'} />
-            <div className="flex gap-2 mt-3 text-[9px] font-bold uppercase text-center">
-              <button onClick={() => setWindDirection(-1)} className={`flex-1 py-1 rounded border transition ${windDirection === -1 ? 'bg-sky-500 border-sky-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`} disabled={isSunk || weatherMode !== 'OFF'}>{txt.fromDock}</button>
-              <button onClick={() => setWindDirection(1)} className={`flex-1 py-1 rounded border transition ${windDirection === 1 ? 'bg-sky-500 border-sky-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`} disabled={isSunk || weatherMode !== 'OFF'}>{txt.fromSea}</button>
-            </div>
-          </div>
-
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3 text-left">
-            <div>
-              <label className="flex justify-between mb-1 uppercase font-bold text-blue-400">{txt.totalSternLength} <span className="font-mono">{sternTotalLengthCm} cm</span></label>
-              <input type="range" min="0" max="3000" value={sternTotalLengthCm} onChange={(e) => {
-                const val = parseInt(e.target.value);
-                setSternTotalLengthCm(val);
-                const chainLen = Math.round(val * (sternChainPercent / 100));
-                setSternChainLengthCm(chainLen);
-                setSternRopeLengthCm(val - chainLen);
-              }} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-blue-600" disabled={isSunk} />
-            </div>
-            <div>
-              <label className="flex justify-between mb-1 uppercase font-bold text-slate-100">{txt.chainPercent} <span className="font-mono">{sternChainPercent}%</span></label>
-              <input type="range" min="0" max="100" value={sternChainPercent} onChange={(e) => {
-                const val = parseInt(e.target.value);
-                setSternChainPercent(val);
-                const chainLen = Math.round(sternTotalLengthCm * (val / 100));
-                setSternChainLengthCm(chainLen);
-                setSternRopeLengthCm(sternTotalLengthCm - chainLen);
-              }} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-slate-400" disabled={isSunk} />
-            </div>
-            <div className="pt-2 border-t border-white/5"><label className="flex justify-between mb-2 uppercase font-bold text-emerald-400">{txt.thickness} <span className="font-mono">{chainThickness} mm</span></label>
-            <input type="range" min="6" max="16" step="1" value={chainThickness} onChange={(e) => setChainThickness(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
-            <div><label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.anchorPos} <span className="font-mono">{anchorPositionXCm} cm</span></label>
-            <input type="range" min="0" max="2000" value={anchorPositionXCm} onChange={(e) => setAnchorPositionXCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
-          </div>
-
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left">
-            <label className="flex justify-between mb-1 uppercase font-bold text-amber-400">{txt.bowLine} <span className="font-mono">{bowRopeLengthCm} cm</span></label>
-            <input type="range" min="10" max="200" value={bowRopeLengthCm} onChange={(e) => setBowRopeLengthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-amber-400" disabled={isSunk} />
-          </div>
-
-          {/* New Boat Length Slider */}
-          <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left">
-            <label className="flex justify-between mb-1 uppercase font-bold text-purple-400">{txt.boatLength} <span className="font-mono">{boatLengthCm} cm</span></label>
-            <input type="range" min="300" max="670" value={boatLengthCm} onChange={(e) => setBoatLengthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-purple-400" disabled={isSunk} />
-          </div>
-        </div>
-      </div>
+      <SimulatorControls 
+        txt={txt}
+        startLanguage={language}
+        setLanguage={setLanguage}
+        weatherMode={weatherMode}
+        setWeatherMode={setWeatherMode}
+        waterLevelCm={waterLevelCm}
+        setWaterLevelCm={setWaterLevelCm}
+        seabedDepthCm={seabedDepthCm}
+        setSeabedDepthCm={setSeabedDepthCm}
+        dockHeightCm={dockHeightCm}
+        setDockHeightCm={setDockHeightCm}
+        isFloatingDock={isFloatingDock}
+        setIsFloatingDock={setIsFloatingDock}
+        isSunk={isSunk}
+        waveHeightCm={waveHeightCm}
+        setWaveHeightCm={setWaveHeightCm}
+        windSpeedMs={windSpeedMs}
+        setWindSpeedMs={setWindSpeedMs}
+        windDirection={windDirection}
+        setWindDirection={setWindDirection}
+        sternTotalLengthCm={sternTotalLengthCm}
+        setSternTotalLengthCm={setSternTotalLengthCm}
+        sternChainPercent={sternChainPercent}
+        setSternChainPercent={setSternChainPercent}
+        setSternChainLengthCm={setSternChainLengthCm}
+        setSternRopeLengthCm={setSternRopeLengthCm}
+        chainThickness={chainThickness}
+        setChainThickness={setChainThickness}
+        anchorPositionXCm={anchorPositionXCm}
+        setAnchorPositionXCm={setAnchorPositionXCm}
+        bowRopeLengthCm={bowRopeLengthCm}
+        setBowRopeLengthCm={setBowRopeLengthCm}
+        boatLengthCm={boatLengthCm}
+        setBoatLengthCm={setBoatLengthCm}
+      />
 
       <div className="absolute top-10 left-10 pointer-events-none text-left">
         <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-none border-l-4 border-sky-600 pl-4 text-sky-900">{txt.mainTitle}</h1>

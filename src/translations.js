@@ -23,8 +23,14 @@ export const translations = {
     hudWaves: "Vågor",
     hudDock: "Brygga",
     debugTitle: "DEBUG: FÖRTÖJNINGSDATA",
-    debugStern: "AKTER",
-    debugBow: "FÖR"
+    debugStern: "AKTER (Drag/Längd)",
+    debugBow: "FÖR (Drag/Längd)",
+    debugForce: "KATENARIA KRAFT",
+    debugWind: "VINDKRAFT",
+    debugTotal: "TOTAL KRAFT",
+    debugBow: "FÖR",
+    boatTypeLabel: "BÅTTYP",
+    boatTypes: { small: "Liten (4.5m)", medium: "Mellan (6m)", large: "Stor (10m)" }
   },
   en: {
     title: "Stegerholmen Harbor Control",
@@ -50,7 +56,13 @@ export const translations = {
     hudWaves: "Waves",
     hudDock: "Dock",
     debugTitle: "DEBUG: MOORING DATA",
-    debugStern: "STERN",
-    debugBow: "BOW"
+    debugStern: "STERN (Tension/Len)",
+    debugBow: "BOW (Tension/Len)",
+    debugForce: "CATENARY FORCE",
+    debugWind: "WIND FORCE",
+    debugTotal: "TOTAL FORCE",
+    debugBow: "BOW",
+    boatTypeLabel: "BOAT TYPE",
+    boatTypes: { small: "Small (4.5m)", medium: "Medium (6m)", large: "Large (10m)" }
   }
 };

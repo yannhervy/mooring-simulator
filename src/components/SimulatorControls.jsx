@@ -36,6 +36,25 @@ const SimulatorControls = ({
   boatLengthCm,
   setBoatLengthCm
 }) => {
+  const btnClass = "w-6 h-6 flex items-center justify-center bg-slate-700 text-slate-200 rounded hover:bg-slate-600 disabled:opacity-50 font-mono text-lg font-bold pb-1 leading-none";
+
+  // Specialized updaters to handle interdependent state
+  const updateSternLen = (val) => {
+      const v = Math.max(0, Math.min(3000, val));
+      setSternTotalLengthCm(v);
+      const chainLen = Math.round(v * (sternChainPercent / 100));
+      setSternChainLengthCm(chainLen);
+      setSternRopeLengthCm(v - chainLen);
+  };
+  
+  const updateChainPct = (val) => {
+      const v = Math.max(0, Math.min(100, val));
+      setSternChainPercent(v);
+      const chainLen = Math.round(sternTotalLengthCm * (v / 100));
+      setSternChainLengthCm(chainLen);
+      setSternRopeLengthCm(sternTotalLengthCm - chainLen);
+  };
+
   return (
     <div className="absolute top-6 right-6 z-20 bg-slate-900/95 backdrop-blur-md p-6 rounded-2xl border border-slate-700 shadow-2xl w-80 max-h-[95vh] overflow-y-auto scrollbar-hide text-left">
       <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-4">
@@ -57,10 +76,22 @@ const SimulatorControls = ({
         </div>
         
         <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3">
-          <div><label className="flex justify-between mb-1 uppercase font-bold text-sky-400">{txt.waterLevel} <span className="font-mono">{waterLevelCm} cm</span></label>
-          <input type="range" min="-300" max="300" value={waterLevelCm} onChange={(e) => setWaterLevelCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-sky-500" disabled={isSunk || weatherMode !== 'OFF'} /></div>
-          <div><label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.depth} <span className="font-mono">{seabedDepthCm} cm</span></label>
-          <input type="range" min="0" max="1200" value={seabedDepthCm} onChange={(e) => setSeabedDepthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
+          <div>
+              <label className="flex justify-between mb-1 uppercase font-bold text-sky-400">{txt.waterLevel} <span className="font-mono">{waterLevelCm} cm</span></label>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => setWaterLevelCm(Math.max(-300, waterLevelCm - 1))} disabled={isSunk || weatherMode !== 'OFF'} className={btnClass}>-</button>
+                  <input type="range" min="-300" max="300" value={waterLevelCm} onChange={(e) => setWaterLevelCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-sky-500" disabled={isSunk || weatherMode !== 'OFF'} />
+                  <button onClick={() => setWaterLevelCm(Math.min(300, waterLevelCm + 1))} disabled={isSunk || weatherMode !== 'OFF'} className={btnClass}>+</button>
+              </div>
+          </div>
+          <div>
+              <label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.depth} <span className="font-mono">{seabedDepthCm} cm</span></label>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => setSeabedDepthCm(Math.max(0, seabedDepthCm - 1))} disabled={isSunk} className={btnClass}>-</button>
+                  <input type="range" min="0" max="1200" value={seabedDepthCm} onChange={(e) => setSeabedDepthCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} />
+                  <button onClick={() => setSeabedDepthCm(Math.min(1200, seabedDepthCm + 1))} disabled={isSunk} className={btnClass}>+</button>
+              </div>
+          </div>
           
           {/* Dock Height Slider */}
           <div>
@@ -71,17 +102,31 @@ const SimulatorControls = ({
                 <label htmlFor="floatingDock" className="text-[9px] text-amber-300 font-bold uppercase cursor-pointer">{txt.floatingDock}</label>
               </div>
             </div>
-            <input type="range" min="100" max="500" value={dockHeightCm} onChange={(e) => setDockHeightCm(parseInt(e.target.value))} className={`w-full h-1 rounded-lg appearance-none ${isFloatingDock ? 'bg-slate-700 cursor-not-allowed' : 'bg-slate-700 accent-amber-500'}`} disabled={isSunk || isFloatingDock} />
+            <div className="flex items-center gap-2">
+                <button onClick={() => setDockHeightCm(Math.max(100, dockHeightCm - 1))} disabled={isSunk || isFloatingDock} className={btnClass}>-</button>
+                <input type="range" min="100" max="500" value={dockHeightCm} onChange={(e) => setDockHeightCm(parseInt(e.target.value))} className={`flex-1 h-1 rounded-lg appearance-none ${isFloatingDock ? 'bg-slate-700 cursor-not-allowed' : 'bg-slate-700 accent-amber-500'}`} disabled={isSunk || isFloatingDock} />
+                <button onClick={() => setDockHeightCm(Math.min(500, dockHeightCm + 1))} disabled={isSunk || isFloatingDock} className={btnClass}>+</button>
+            </div>
           </div>
 
           {/* Wave Height Slider */}
-          <div><label className="flex justify-between mb-1 uppercase font-bold text-slate-400">{txt.waveHeight} <span className="font-mono">{waveHeightCm} cm</span></label>
-          <input type="range" min="0" max="100" value={waveHeightCm} onChange={(e) => setWaveHeightCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-sky-500" disabled={isSunk || weatherMode !== 'OFF'} /></div>
+          <div>
+              <label className="flex justify-between mb-1 uppercase font-bold text-slate-400">{txt.waveHeight} <span className="font-mono">{waveHeightCm} cm</span></label>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => setWaveHeightCm(Math.max(0, waveHeightCm - 1))} disabled={isSunk || weatherMode !== 'OFF'} className={btnClass}>-</button>
+                  <input type="range" min="0" max="100" value={waveHeightCm} onChange={(e) => setWaveHeightCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-sky-500" disabled={isSunk || weatherMode !== 'OFF'} />
+                  <button onClick={() => setWaveHeightCm(Math.min(100, waveHeightCm + 1))} disabled={isSunk || weatherMode !== 'OFF'} className={btnClass}>+</button>
+              </div>
+          </div>
         </div>
 
         <div className="bg-white/5 p-3 rounded-lg border border-white/10">
           <label className="flex justify-between mb-2 uppercase font-bold text-sky-300">{txt.windSpeed} <span className="font-mono">{windSpeedMs} m/s</span></label>
-          <input type="range" min="0" max="40" value={windSpeedMs} onChange={(e) => setWindSpeedMs(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-sky-400" disabled={isSunk || weatherMode !== 'OFF'} />
+          <div className="flex items-center gap-2">
+              <button onClick={() => setWindSpeedMs(Math.max(0, windSpeedMs - 1))} disabled={isSunk || weatherMode !== 'OFF'} className={btnClass}>-</button>
+              <input type="range" min="0" max="40" value={windSpeedMs} onChange={(e) => setWindSpeedMs(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-sky-400" disabled={isSunk || weatherMode !== 'OFF'} />
+              <button onClick={() => setWindSpeedMs(Math.min(40, windSpeedMs + 1))} disabled={isSunk || weatherMode !== 'OFF'} className={btnClass}>+</button>
+          </div>
           <div className="flex gap-2 mt-3 text-[9px] font-bold uppercase text-center">
             <button onClick={() => setWindDirection(-1)} className={`flex-1 py-1 rounded border transition ${windDirection === -1 ? 'bg-sky-500 border-sky-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`} disabled={isSunk || weatherMode !== 'OFF'}>{txt.fromDock}</button>
             <button onClick={() => setWindDirection(1)} className={`flex-1 py-1 rounded border transition ${windDirection === 1 ? 'bg-sky-500 border-sky-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`} disabled={isSunk || weatherMode !== 'OFF'}>{txt.fromSea}</button>
@@ -91,39 +136,63 @@ const SimulatorControls = ({
         <div className="bg-white/5 p-3 rounded-lg border border-white/10 space-y-3 text-left">
           <div>
             <label className="flex justify-between mb-1 uppercase font-bold text-blue-400">{txt.totalSternLength} <span className="font-mono">{sternTotalLengthCm} cm</span></label>
-            <input type="range" min="0" max="3000" value={sternTotalLengthCm} onChange={(e) => {
-              const val = parseInt(e.target.value);
-              setSternTotalLengthCm(val);
-              const chainLen = Math.round(val * (sternChainPercent / 100));
-              setSternChainLengthCm(chainLen);
-              setSternRopeLengthCm(val - chainLen);
-            }} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-blue-600" disabled={isSunk} />
+            <div className="flex items-center gap-2">
+                <button onClick={() => updateSternLen(sternTotalLengthCm - 1)} disabled={isSunk} className={btnClass}>-</button>
+                <input type="range" min="0" max="3000" value={sternTotalLengthCm} onChange={(e) => updateSternLen(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-blue-600" disabled={isSunk} />
+                <button onClick={() => updateSternLen(sternTotalLengthCm + 1)} disabled={isSunk} className={btnClass}>+</button>
+            </div>
           </div>
           <div>
             <label className="flex justify-between mb-1 uppercase font-bold text-slate-100">{txt.chainPercent} <span className="font-mono">{sternChainPercent}%</span></label>
-            <input type="range" min="0" max="100" value={sternChainPercent} onChange={(e) => {
-              const val = parseInt(e.target.value);
-              setSternChainPercent(val);
-              const chainLen = Math.round(sternTotalLengthCm * (val / 100));
-              setSternChainLengthCm(chainLen);
-              setSternRopeLengthCm(sternTotalLengthCm - chainLen);
-            }} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-slate-400" disabled={isSunk} />
+            <div className="flex items-center gap-2">
+                <button onClick={() => updateChainPct(sternChainPercent - 1)} disabled={isSunk} className={btnClass}>-</button>
+                <input type="range" min="0" max="100" value={sternChainPercent} onChange={(e) => updateChainPct(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-slate-400" disabled={isSunk} />
+                <button onClick={() => updateChainPct(sternChainPercent + 1)} disabled={isSunk} className={btnClass}>+</button>
+            </div>
           </div>
-          <div className="pt-2 border-t border-white/5"><label className="flex justify-between mb-2 uppercase font-bold text-emerald-400">{txt.thickness} <span className="font-mono">{chainThickness} mm</span></label>
-          <input type="range" min="6" max="16" step="1" value={chainThickness} onChange={(e) => setChainThickness(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
-          <div><label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.anchorPos} <span className="font-mono">{anchorPositionXCm} cm</span></label>
-          <input type="range" min="0" max="2000" value={anchorPositionXCm} onChange={(e) => setAnchorPositionXCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} /></div>
+          <div className="pt-2 border-t border-white/5">
+              <label className="flex justify-between mb-2 uppercase font-bold text-emerald-400">{txt.thickness} <span className="font-mono">{chainThickness} mm</span></label>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => setChainThickness(Math.max(6, chainThickness - 1))} disabled={isSunk} className={btnClass}>-</button>
+                  <input type="range" min="6" max="16" step="1" value={chainThickness} onChange={(e) => setChainThickness(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} />
+                  <button onClick={() => setChainThickness(Math.min(16, chainThickness + 1))} disabled={isSunk} className={btnClass}>+</button>
+              </div>
+          </div>
+          <div>
+              <label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.anchorPos} <span className="font-mono">{anchorPositionXCm} cm</span></label>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => setAnchorPositionXCm(Math.max(0, anchorPositionXCm - 1))} disabled={isSunk} className={btnClass}>-</button>
+                  <input type="range" min="0" max="2000" value={anchorPositionXCm} onChange={(e) => setAnchorPositionXCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} />
+                  <button onClick={() => setAnchorPositionXCm(Math.min(2000, anchorPositionXCm + 1))} disabled={isSunk} className={btnClass}>+</button>
+              </div>
+          </div>
         </div>
 
         <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left">
           <label className="flex justify-between mb-1 uppercase font-bold text-amber-400">{txt.bowLine} <span className="font-mono">{bowRopeLengthCm} cm</span></label>
-          <input type="range" min="10" max="200" value={bowRopeLengthCm} onChange={(e) => setBowRopeLengthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-amber-400" disabled={isSunk} />
+          <div className="flex items-center gap-2">
+              <button onClick={() => setBowRopeLengthCm(Math.max(10, bowRopeLengthCm - 1))} disabled={isSunk} className={btnClass}>-</button>
+              <input type="range" min="10" max="200" value={bowRopeLengthCm} onChange={(e) => setBowRopeLengthCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-amber-400" disabled={isSunk} />
+              <button onClick={() => setBowRopeLengthCm(Math.min(200, bowRopeLengthCm + 1))} disabled={isSunk} className={btnClass}>+</button>
+          </div>
         </div>
 
-        {/* New Boat Length Slider */}
+        {/* Boat Type Presets */}
+        <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left mb-2">
+            <label className="text-[9px] uppercase font-bold text-purple-300 mb-1 block">{txt.boatTypeLabel}</label>
+            <div className="flex gap-1">
+                <button onClick={() => setBoatLengthCm(450)} className="flex-1 py-1 bg-slate-800 border border-slate-600 rounded text-[9px] text-purple-200 hover:bg-slate-700">{txt.boatTypes.small}</button>
+                <button onClick={() => setBoatLengthCm(600)} className="flex-1 py-1 bg-slate-800 border border-slate-600 rounded text-[9px] text-purple-200 hover:bg-slate-700">{txt.boatTypes.medium}</button>
+                <button onClick={() => setBoatLengthCm(1000)} className="flex-1 py-1 bg-slate-800 border border-slate-600 rounded text-[9px] text-purple-200 hover:bg-slate-700">{txt.boatTypes.large}</button>
+            </div>
+        </div>
         <div className="bg-white/5 p-3 rounded-lg border border-white/10 text-left">
           <label className="flex justify-between mb-1 uppercase font-bold text-purple-400">{txt.boatLength} <span className="font-mono">{boatLengthCm} cm</span></label>
-          <input type="range" min="300" max="670" value={boatLengthCm} onChange={(e) => setBoatLengthCm(parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none accent-purple-400" disabled={isSunk} />
+          <div className="flex items-center gap-2">
+              <button onClick={() => setBoatLengthCm(Math.max(300, boatLengthCm - 1))} disabled={isSunk} className={btnClass}>-</button>
+              <input type="range" min="300" max="1200" value={boatLengthCm} onChange={(e) => setBoatLengthCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-purple-400" disabled={isSunk} />
+              <button onClick={() => setBoatLengthCm(Math.min(1200, boatLengthCm + 1))} disabled={isSunk} className={btnClass}>+</button>
+          </div>
         </div>
       </div>
     </div>

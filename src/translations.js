@@ -1,7 +1,7 @@
 export const translations = {
   sv: {
-    title: "Stegerholmens Hamnkontroll",
-    mainTitle: "Stegerholmens Småbåtshamn",
+    title: "Hamnkontroll",
+    mainTitle: "Stegerholmen",
     weatherLabel: "VÄDERLEK",
     modes: { OFF: 'AV', NORMAL: 'NORMAL', EXTREME: 'EXTREM' },
     waterLevel: "Vattennivå",
@@ -31,15 +31,18 @@ export const translations = {
     debugStern: "AKTER (Drag/Längd)",
     debugBow: "FÖR (Drag/Längd)",
     debugForce: "KATENARIA KRAFT",
+    hudChainForce: "Kättingkraft",
+    hudRopeForce: "Lina Kraft",
     debugWind: "VINDKRAFT",
     debugTotal: "TOTAL KRAFT",
     debugBow: "FÖR",
     boatTypeLabel: "BÅTTYP",
-    boatTypes: { small: "Liten (4.5m)", medium: "Mellan (6m)", large: "Stor (10m)" }
+    boatTypes: { small: "Liten (4.5m)", medium: "Mellan (6m)", large: "Stor (10m)" },
+    simulatorVersion: "Förtöjningssimulator v10.4"
   },
   en: {
-    title: "Stegerholmen Harbor Control",
-    mainTitle: "Stegerholmen Marina",
+    title: "Harbor Control",
+    mainTitle: "Stegerholmen",
     weatherLabel: "WEATHER",
     modes: { OFF: 'OFF', NORMAL: 'NORMAL', EXTREME: 'EXTREME' },
     waterLevel: "Water Level",
@@ -69,10 +72,13 @@ export const translations = {
     debugStern: "STERN (Tension/Len)",
     debugBow: "BOW (Tension/Len)",
     debugForce: "CATENARY FORCE",
+    hudChainForce: "Chain Force",
+    hudRopeForce: "Rope Force",
     debugWind: "WIND FORCE",
     debugTotal: "TOTAL FORCE",
     debugBow: "BOW",
     boatTypeLabel: "BOAT TYPE",
-    boatTypes: { small: "Small (4.5m)", medium: "Medium (6m)", large: "Large (10m)" }
+    boatTypes: { small: "Small (4.5m)", medium: "Medium (6m)", large: "Large (10m)" },
+    simulatorVersion: "Mooring Simulator v10.4"
   }
 };

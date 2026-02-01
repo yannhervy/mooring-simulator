@@ -29,7 +29,7 @@ const App = () => {
   // --- CONFIGURATION ---
   // Ändra dessa värden för att ställa in default-läget
   const CONFIG = {
-      defaultSternTotal: 980, // 15m default for 6.5m boat
+      defaultSternTotal: 950, // 15m default for 6.5m boat
       defaultChainPercent: 85
   };
 
@@ -44,7 +44,7 @@ const App = () => {
   const [sternChainPercent, setSternChainPercent] = useState(CONFIG.defaultChainPercent);
   const [sternChainLengthCm, setSternChainLengthCm] = useState(initChain); 
   const [sternRopeLengthCm, setSternRopeLengthCm] = useState(initRope); 
-  const [bowRopeLengthCm, setBowRopeLengthCm] = useState(250); 
+  const [bowRopeLengthCm, setBowRopeLengthCm] = useState(120); 
   const [anchorPositionXCm, setAnchorPositionXCm] = useState(1500); // 25m
   const [boatLengthCm, setBoatLengthCm] = useState(650); // 6.5m
   
@@ -1013,8 +1013,8 @@ const App = () => {
 
 
 
-        distS = Math.sqrt(Math.pow(sternAttachX - anchorX, 2) + Math.pow(sternAttachY - seaY, 2));
-        distF = Math.sqrt(Math.pow(bowAttachX - dockX, 2) + Math.pow(bowAttachY - dockY, 2));
+        distS = Math.sqrt(Math.pow(sternAttachX - anchorX, 2) + Math.pow(sternAttachY - seaY, 2)) / P_SCALE;
+        distF = Math.sqrt(Math.pow(bowAttachX - dockX, 2) + Math.pow(bowAttachY - dockY, 2)) / P_SCALE;
         
         sTaut = distS >= maxSternStretch - 1;
         fTaut = distF >= r.bowRopeLengthCm; 

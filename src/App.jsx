@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SimulatorControls from './components/SimulatorControls';
 import { translations as t } from './translations';
-import { solveCatenary } from './utils/catenary';
+import { solveCatenary, calculateWeight, solveSeabedCatenary } from './utils/catenary';
 import boatImage from './assets/650_sidovy_1400px.webp';
 
 /**
@@ -20,17 +20,17 @@ const App = () => {
   const [language, setLanguage] = useState('sv'); 
   
   const [waterLevelCm, setWaterLevelCm] = useState(20); 
-  const [seabedDepthCm, setSeabedDepthCm] = useState(100); 
+  const [seabedDepthCm, setSeabedDepthCm] = useState(200); 
   const [waveHeightCm, setWaveHeightCm] = useState(10); 
   
-  const [dockHeightCm, setDockHeightCm] = useState(200); 
+  const [dockHeightCm, setDockHeightCm] = useState(300); 
   const [isFloatingDock, setIsFloatingDock] = useState(false);
 
   // --- CONFIGURATION ---
   // Ändra dessa värden för att ställa in default-läget
   const CONFIG = {
-      defaultSternTotal: 720,
-      defaultChainPercent: 70
+      defaultSternTotal: 980, // 15m default for 6.5m boat
+      defaultChainPercent: 85
   };
 
   const calcChain = (total, percent) => Math.round(total * (percent / 100));
@@ -44,9 +44,9 @@ const App = () => {
   const [sternChainPercent, setSternChainPercent] = useState(CONFIG.defaultChainPercent);
   const [sternChainLengthCm, setSternChainLengthCm] = useState(initChain); 
   const [sternRopeLengthCm, setSternRopeLengthCm] = useState(initRope); 
-  const [bowRopeLengthCm, setBowRopeLengthCm] = useState(120); 
-  const [anchorPositionXCm, setAnchorPositionXCm] = useState(1000);
-  const [boatLengthCm, setBoatLengthCm] = useState(300); 
+  const [bowRopeLengthCm, setBowRopeLengthCm] = useState(250); 
+  const [anchorPositionXCm, setAnchorPositionXCm] = useState(1500); // 25m
+  const [boatLengthCm, setBoatLengthCm] = useState(650); // 6.5m
   
   const [windSpeedMs, setWindSpeedMs] = useState(15); 
   const [windDirection, setWindDirection] = useState(1); 
@@ -54,8 +54,12 @@ const App = () => {
   
   const [weatherMode, setWeatherMode] = useState('OFF');
   const [isSunk, setIsSunk] = useState(false);
+  const [isAnchorDragged, setIsAnchorDragged] = useState(false);
+  const [dragDistance, setDragDistance] = useState(0);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [showRotatePrompt, setShowRotatePrompt] = useState(false);
 
   // Realistic chain weights (kg/m) based on thickness (mm)
   // Using average values where ranges are given
@@ -107,7 +111,14 @@ const App = () => {
   // If stern tension exceeds this, anchor will drag along seabed
   // Typical holding power: 500-2000N depending on anchor type/bottom
   // ============================================================
-  const ANCHOR_HOLD_FORCE = 2000; // Newtons 
+  const ANCHOR_HOLD_FORCE = 5000; // Newtons 
+
+  // ============================================================
+  // VISUAL WATERLINE FACTOR - Adjust how high the boat floats
+  // Does not change floating force, only visual position.
+  // Higher value = Boat sits higher (more hull visible)
+  // ============================================================
+  const BOAT_WATERLINE_CM = 75; 
 
   // Utökat moln-array för mer variation
   const cloudsRef = useRef([
@@ -130,11 +141,32 @@ const App = () => {
     lang: 'sv', isFloatingDock: false,
     debugData: { sternDist: 0, sternMax: 0, frontDist: 0, frontMax: 0 },
     // Anchor dragging state
-    anchorCurrentX: 600,  // Actual anchor position (can move when dragging)
+    anchorCurrentX: 2500,  // Actual anchor position (can move when dragging)
     anchorDragged: false, // True if anchor has moved from set position
     anchorRotation: 0,    // 0 = normal, Math.PI/2 = rotated 90° when dragging
-    sternTensionForce: 0  // Track current stern tension for display
+    sternTensionForce: 0,  // Track current stern tension for display
+    lastMooringInteraction: Date.now(), // Allow 5s grace period on start
+    uiSyncAnchorDragged: false, // Prevent state update loop
+    anchorStartPos: 1500 // Track start pos for drag calc
   });
+
+  // Reset interaction timer when mooring parameters change
+  useEffect(() => {
+      refs.current.uiSyncAnchorDragged = false;
+      setIsAnchorDragged(false);
+      setDragDistance(0);
+      refs.current.lastMooringInteraction = Date.now();
+      refs.current.anchorStartPos = anchorPositionXCm; // Update start pos reference
+      // Also reset anchor drag state if user manually moves it or changes line
+      refs.current.anchorDragged = false;
+      // If user moves anchor slider, sync current position immediately
+      // (Unless it was dragged? Maybe best to just reset to slider value)
+      // Yes, slider controls "Intended" position. If dragged, it drifts.
+      // But if user TOUCHES slider, we snap back to slider value.
+      if (Math.abs(refs.current.anchorCurrentX - anchorPositionXCm) > 10) {
+           refs.current.anchorCurrentX = anchorPositionXCm;
+      }
+  }, [sternChainLengthCm, sternRopeLengthCm, anchorPositionXCm, boatLengthCm]);
 
   // Preload boat image
   const boatImgRef = useRef(null);
@@ -219,23 +251,34 @@ const App = () => {
     setIsSunk(false);
     setShowRestart(false);
     setWaterLevelCm(20);
-    setSeabedDepthCm(100);
+    setSeabedDepthCm(250);
     setDockHeightCm(200);
     setWaveHeightCm(10);
-    setWaveHeightCm(10);
-    setWaveHeightCm(10);
-    setSternTotalLengthCm(CONFIG.defaultSternTotal);
+    setSternTotalLengthCm(3000);
     setSternChainPercent(CONFIG.defaultChainPercent);
-    setSternChainLengthCm(initChain);
-    setSternRopeLengthCm(initRope);
-    setBowRopeLengthCm(120);
-    setAnchorPositionXCm(1200);
-    setBoatLengthCm(300);
+    setSternChainLengthCm(2000);
+    setSternRopeLengthCm(1000);
+    setChainThickness(10);
+    setBowRopeLengthCm(250);
+    setAnchorPositionXCm(2500);
+    setBoatLengthCm(650);
+    
+    // Reset Refs logic
+    refs.current.boatX = 0;
+    refs.current.boatVX = 0;
+    refs.current.isSunk = false;
+    refs.current.sinkingY = 0;
+    refs.current.anchorDragged = false;
+    refs.current.anchorRotation = 0;
+    refs.current.anchorCurrentX = 2500;
+    
+    // Ensure these match state
+    refs.current.sternChainLengthCm = 2000;
+    refs.current.sternRopeLengthCm = 1000;
     setWindSpeedMs(15);
     setWindDirection(1);
     setChainThickness(10);
     setWeatherMode('OFF');
-
     refs.current.boatX = 0;
     refs.current.sinkingY = 0;
     refs.current.isSunk = false;
@@ -244,12 +287,29 @@ const App = () => {
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
-        setDimensions({ width: containerRef.current.offsetWidth, height: containerRef.current.offsetHeight });
+        const w = containerRef.current.offsetWidth;
+        const h = containerRef.current.offsetHeight;
+        setDimensions({ width: w, height: h });
+        
+        // Calculate auto-zoom based on screen size
+        // Base design is for 1200px width
+        const baseWidth = 1200;
+        const autoZoom = Math.min(1.5, Math.max(0.5, w / baseWidth));
+        setZoom(autoZoom);
+        
+        // Check for portrait mode on mobile (width < 768px and height > width)
+        const isMobile = w < 768;
+        const isPortrait = h > w;
+        setShowRotatePrompt(isMobile && isPortrait);
       }
     };
     window.addEventListener('resize', updateSize);
+    window.addEventListener('orientationchange', updateSize);
     updateSize();
-    return () => window.removeEventListener('resize', updateSize);
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('orientationchange', updateSize);
+    };
   }, []);
 
   useEffect(() => {
@@ -269,28 +329,51 @@ const App = () => {
       
       if (img) {
         // Image dimensions: 1400px wide, we need to scale to match boat length
-        // The image aspect ratio is approximately 1400 x 400 (3.5:1)
         const imgAspect = img.width / img.height;
         const boatWidth = length * 1.15; // Slightly larger to include motor
         const boatHeight = boatWidth / imgAspect;
         
         // Position: center the boat, with waterline roughly at y=0
-        // The boat image has the waterline at about 60% from top
         const offsetX = -boatWidth / 2;
-        const offsetY = -boatHeight * 0.4; // Adjust to put waterline at y=0
+        const offsetY = -boatHeight * 0.4;
         
-        // Draw the boat image (no red coloring - anchor will show stress instead)
-        ctx.drawImage(img, offsetX, offsetY, boatWidth, boatHeight);
+        // Check if boat is colliding
+        const isColliding = state === 'colliding' || state === 'critical';
+        
+        if (isColliding) {
+          // Use offscreen canvas to create masked red overlay
+          const offCanvas = document.createElement('canvas');
+          offCanvas.width = Math.ceil(boatWidth);
+          offCanvas.height = Math.ceil(boatHeight);
+          const offCtx = offCanvas.getContext('2d');
+          
+          // Draw boat image on offscreen canvas
+          offCtx.drawImage(img, 0, 0, boatWidth, boatHeight);
+          
+          // Use 'source-in' to draw red only where boat pixels exist (respects alpha)
+          offCtx.globalCompositeOperation = 'source-in';
+          offCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+          offCtx.fillRect(0, 0, boatWidth, boatHeight);
+          
+          // Draw original boat first
+          ctx.drawImage(img, offsetX, offsetY, boatWidth, boatHeight);
+          
+          // Draw the red-masked overlay on top
+          ctx.drawImage(offCanvas, offsetX, offsetY);
+        } else {
+          // Normal boat drawing
+          ctx.drawImage(img, offsetX, offsetY, boatWidth, boatHeight);
+        }
       } else {
         // Fallback: simple rectangle if image not loaded
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = state === 'colliding' ? '#ef4444' : '#ffffff';
         ctx.fillRect(-length/2, -length * 0.1, length, length * 0.2);
       }
       
       ctx.restore();
     };
 
-    const drawHorizontalRuler = (ctx, seabedY, dockX) => {
+    const drawHorizontalRuler = (ctx, seabedY, dockX, pScale = 1.0) => {
       ctx.save();
       ctx.strokeStyle = 'rgba(15, 23, 42, 0.3)'; ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
       ctx.lineWidth = 1; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
@@ -298,44 +381,42 @@ const App = () => {
       // Base line
       ctx.beginPath(); ctx.moveTo(0, seabedY); ctx.lineTo(dimensions.width, seabedY); ctx.stroke();
       
-      // We want to draw ticks relative to the dock.
-      // 1 meter = 100px.
-      // Find the first meter mark visible on screen (left side, x=0)
-      // dockX is at value 0. Left of dock is positive distance? Or negative?
-      // Based on previous code: distFromDock = dockX - x.
-      // So at x=0, dist = dockX.
-      // We want markers at 0, 100, 200, ... from dockX.
+      const pxPerM = 100 * pScale;
+      // Step: typically 10cm or 20cm depending on scale. 
+      // At scale 0.5, 10cm = 5px. This is fine.
+      const stepPx = 10 * pScale; 
       
-      const startPixel = 0;
-      const endPixel = dimensions.width;
+      // Iterate relative to dockX
+      // We start from the left edge of the screen (0)
+      // 0 = dockX + offset => offset = -dockX
+      const minOffset = -dockX;
+      const maxOffset = dimensions.width - dockX;
       
-      // Iterate every 10 pixels roughly, but align to dock
-      // Let's iterate RELATIVE to dockX.
-      // Start from closest 10px mark to the left edge
-      const firstMarkOffset = Math.ceil((startPixel - dockX) / 10) * 10;
+      // Align start to the grid
+      const startOffset = Math.ceil(minOffset / stepPx) * stepPx;
       
-      for (let offset = firstMarkOffset; (dockX + offset) <= endPixel; offset += 10) {
+      for (let offset = startOffset; offset <= maxOffset; offset += stepPx) {
           const x = dockX + offset;
-          const dist = Math.abs(offset); // Distance from dock in pixels
-          
-          // Avoid drawing off-screen (though loop condition handles right side, ensure left)
-          if(x < 0) continue;
-
-          // Check if it's a meter (100px), half-meter (50px), or decimeter (10px)
-          // We use Math.round to avoid float precision issues, though dealing with integers usually.
-          const isMeter = Math.round(dist) % 100 === 0;
-          const isHalfMeter = Math.round(dist) % 50 === 0;
+          // Distance in CM (Logical)
+          // Positive offset is RIGHT of dock (Negative distance)
+          // Negative offset is LEFT of dock (Positive distance)
+          const distCm = Math.round(offset / -pScale);
           
           ctx.beginPath();
-          if (isMeter) {
+          
+          if (distCm % 100 === 0) {
+              // Meter mark
               ctx.moveTo(x, seabedY); ctx.lineTo(x, seabedY + 15); ctx.stroke();
-              // Label: Convert px to m. offset 0 is 0m. -100 is 1m (or -1m).
-              const label = (offset / -100).toFixed(0) + 'm'; 
+              const label = (distCm / 100).toFixed(0) + 'm'; 
               ctx.fillText(label, x, seabedY + 28);
-          } else if (isHalfMeter) {
+          } else if (distCm % 50 === 0) {
+              // Half meter
               ctx.moveTo(x, seabedY); ctx.lineTo(x, seabedY + 8); ctx.stroke();
           } else {
-              ctx.moveTo(x, seabedY); ctx.lineTo(x, seabedY + 4); ctx.stroke();
+              // Decimeter (only draw if scale is large enough to see, e.g., > 3px step)
+              if (stepPx > 2) {
+                  ctx.moveTo(x, seabedY); ctx.lineTo(x, seabedY + 4); ctx.stroke();
+              }
           }
       }
       ctx.restore();
@@ -399,6 +480,9 @@ const App = () => {
     };
 
     const animate = () => {
+      // GLOBAL SCALE: 0.5px = 1cm
+      const P_SCALE = 0.5; 
+
       time += 0.02;
       const r = refs.current;
       const chainW = calculateWeight(r.thickness);
@@ -406,12 +490,39 @@ const App = () => {
       const effectiveSagWeight = totStern > 0 ? ((chainW * r.sternChainLengthCm) + (ROPE_WEIGHT_PER_M * r.sternRopeLengthCm)) / totStern : chainW;
       
       const waveVar = 1 + 0.2 * Math.sin(time * 0.7); 
-      const currentAmp = r.waveHeightCm * waveVar;
+      const currentAmp = r.waveHeightCm * waveVar * P_SCALE;
 
       const phaseSpeed = (WAVE_SPEED_CM_S / 60) * WAVE_K * r.windDir; 
       r.wavePhase -= phaseSpeed; 
 
       ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+      
+      // FILL ENTIRE CANVAS with a neutral background first (prevents any gaps)
+      ctx.fillStyle = '#64748b'; // Slate-500 - matches rock color
+      ctx.fillRect(0, 0, dimensions.width, dimensions.height);
+      
+      // Pre-calculate base positions for background fill (before zoom)
+      const b0Y_base = dimensions.height * 0.6;
+      const seaY_base = b0Y_base + (r.seabedDepthCm * P_SCALE);
+      
+      // Fill entire canvas with base colors BEFORE zoom (prevents edge gaps)
+      // Sky - fill entire top portion
+      const windFactorBase = Math.min(1, Math.abs(r.windSpeedMs) / 20);
+      const sFactorBase = windFactorBase * 0.8;
+      ctx.fillStyle = `rgb(${Math.round(186 + (17 * sFactorBase))},${Math.round(230 - (17 * sFactorBase))},${Math.round(253 - (28 * sFactorBase))})`;
+      ctx.fillRect(0, 0, dimensions.width, b0Y_base);
+      
+      // Water base color - from horizon to bottom
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.85)';
+      ctx.fillRect(0, b0Y_base - 20, dimensions.width, dimensions.height);
+      
+      // Apply zoom transform (scale from center)
+      ctx.save();
+      const centerX = dimensions.width / 2;
+      const centerY = dimensions.height / 2;
+      ctx.translate(centerX, centerY);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-centerX, -centerY);
 
       // Simulate Wind with Gusts: Base + Low Freq Gusts + High Freq Noise
       const baseWind = r.windSpeedMs;
@@ -433,30 +544,50 @@ const App = () => {
       const gSky = 230 + ((213 - 230) * sFactor);
       const bSky = 253 + ((225 - 253) * sFactor);
       
+      // Calculate visible viewport bounds accounting for zoom
+      // When zoomed out (zoom < 1), we can see more area
+      const viewportExtend = 1 / zoom; // How much larger the visible area is
+      const extendedWidth = dimensions.width * viewportExtend;
+      const extendedHeight = dimensions.height * viewportExtend;
+      const viewOffsetX = (extendedWidth - dimensions.width) / 2;
+      const viewOffsetY = (extendedHeight - dimensions.height) / 2;
+      
       ctx.fillStyle = `rgb(${Math.round(rSky)},${Math.round(gSky)},${Math.round(bSky)})`;
-      ctx.fillRect(0,0, dimensions.width, dimensions.height); // Rita himmel
+      // Fill extended area to account for zoom
+      ctx.fillRect(-viewOffsetX, -viewOffsetY, extendedWidth, extendedHeight);
       
       const b0Y = dimensions.height * 0.6; 
-      const curY = b0Y - r.waterLevelCm;
-      const seaY = b0Y + r.seabedDepthCm; 
+      // SCALE FACTOR: 0.5px = 1cm (Doubles the field of view in meters)
+      // P_SCALE is already defined at top of animate() 
+      
+      const curY = b0Y - (r.waterLevelCm * P_SCALE);
+      const seaY = b0Y + (r.seabedDepthCm * P_SCALE); 
       
       let catenaryPoints = null; 
       let bowCatenaryPoints = null; 
       
       // Dynamisk bryggposition för att hantera stora båtar
       // Bryggan flyttas så att den alltid är "framför" båten vid start
-      const dockX = (dimensions.width / 2) + Math.max(200, r.boatLengthCm * 0.7); 
-      // Anchor position uses anchorCurrentX which can change when anchor drags
-      const anchorX = dockX - r.anchorCurrentX;
+      const dockX = (dimensions.width / 2) + Math.max(200, (r.boatLengthCm * 0.7 * P_SCALE)); 
+      // Anchor position uses anchorCurrentX (CM) -> Scaled to Pixels
+      const anchorX = dockX - (r.anchorCurrentX * P_SCALE);
 
 
       let dockY;
       if (r.isFloatingDock) {
+        // Wave offset calculated on CM coordinates or Screen? 
+        // WAVE_K is usually small. Visual effect primarily.
+        // Let's use dockX (screen) for wave phase, it's fine.
         const dockWaveOffset = Math.sin(dockX * WAVE_K + r.wavePhase) * currentAmp;
         dockY = curY + dockWaveOffset - 15; 
       } else {
-        dockY = seaY - r.dockHeightCm; 
+        // Fixed Dock: Height measured from seabed (seaY)
+        dockY = seaY - (r.dockHeightCm * P_SCALE); 
       }
+      
+      // Pass P_SCALE to refs for access in event handlers if needed
+      // (Or just use it in draw loops)
+
 
       // Solen (försvinner vid vind > 15-20)
       const sunOpacity = Math.max(0, 1 - (windFactor * 1.2));
@@ -478,11 +609,12 @@ const App = () => {
         }
       });
 
-      // Draw Landscape (Procedural Rocks + Huts)
-      drawLandscape(ctx, dimensions.width, seaY, currentWind, time);
+      // Draw Landscape (Procedural Rocks + Huts) - pass dockX for hut positioning
+      drawLandscape(ctx, dimensions.width, seaY, currentWind, time, viewOffsetX, dockX);
 
       drawRain(ctx, Math.abs(r.windSpeedMs), r.windDir);
 
+      // --- LOGIK ---
       // --- LOGIK ---
       // --- VARIABLES DECLARED TOP SCOPE FOR DEBUG ACCESS ---
       let forceX = 0;
@@ -494,26 +626,31 @@ const App = () => {
       let sTaut, fTaut, fCritical;
       let distS = 0, distF = 0;
 
-      const halfL = r.boatLengthCm / 2;
-      const boatHeight = r.boatLengthCm * 0.25; // Adjusted for new boat image proportions
+      // Scale Boat Dimensions for Screen Positioning (Attach points must match visual scale)
+      // Scale Boat Dimensions for Screen Positioning (Attach points must match visual scale)
+      const halfL = (r.boatLengthCm * P_SCALE) / 2;
+      const boatHeight = (r.boatLengthCm * P_SCALE) * 0.25; 
       
-      // Attachment point offsets (relative to boat center, adjusted for Ryds 650 image)
-      // Stern cleat is at the back of the deck, not at the extreme stern
-      const sternAttachOffsetX = -halfL * 0.85; // Slightly forward from absolute stern
-      const sternAttachOffsetY = -boatHeight * 0.15; // Just above waterline
+      // Attachment point offsets (Screen Pixels)
+      const sternAttachOffsetX = -halfL * 0.85; 
+      const sternAttachOffsetY = -boatHeight * 0.20; // Was 0.15, lifted 30%
       
-      // Bow cleat is on the bow deck area
-      const bowAttachOffsetX = halfL * 0.9; // Near bow point
-      const bowAttachOffsetY = -boatHeight * 0.25; // Above waterline at deck level
+      const bowAttachOffsetX = halfL * 0.9; 
+      const bowAttachOffsetY = -boatHeight * 0.33; // Was 0.25, lifted 30%
       
-      const deckHeightOffset = boatHeight * 0.4; // For physics calculations
+      const deckHeightOffset = boatHeight * 0.52; // Was 0.4, lifted 30%
 
-      const maxSternStretch = r.sternChainLengthCm + (r.sternRopeLengthCm * 1.03); 
-      const maxFrontStretch = r.bowRopeLengthCm * 1.10; 
+      // -----------------------------------------------------------------------
+
+
+
+      const maxSternReach = r.sternChainLengthCm + r.sternRopeLengthCm; // CM
+      const maxSternStretch = maxSternReach * 1.03; // CM
+      const maxFrontStretch = r.bowRopeLengthCm * 1.10; // CM
 
       if (r.isSunk) {
-        r.sinkingY += 0.5;
-        boatXAbs = (dimensions.width / 2) + r.boatX;
+        r.sinkingY += 0.5 * P_SCALE; // Sinking speed scaled visually
+        boatXAbs = (dimensions.width / 2) + (r.boatX * P_SCALE);
         let maxSinkY = seaY - (halfL * 0.6); 
         let currentSinkY = (curY + r.sinkingY);
         if (currentSinkY >= maxSinkY) currentSinkY = maxSinkY;
@@ -521,242 +658,231 @@ const App = () => {
         totalAngle = Math.PI / 12;
         bState = 'sunk';
         const cosA = Math.cos(totalAngle); const sinA = Math.sin(totalAngle);
-        // Use the new attachment point offsets
+        
         sternAttachX = boatXAbs + (sternAttachOffsetX * cosA - sternAttachOffsetY * sinA);
         sternAttachY = boatFinalY + (sternAttachOffsetX * sinA + sternAttachOffsetY * cosA);
         bowAttachX = boatXAbs + (bowAttachOffsetX * cosA - bowAttachOffsetY * sinA);
         bowAttachY = boatFinalY + (bowAttachOffsetX * sinA + bowAttachOffsetY * cosA);
+        
         sTaut = false; fTaut = true; fCritical = true;
-        distS = Math.sqrt(Math.pow(sternAttachX - anchorX, 2) + Math.pow(sternAttachY - seaY, 2));
-        distF = Math.sqrt(Math.pow(bowAttachX - dockX, 2) + Math.pow(bowAttachY - dockY, 2));
+        
+        // Distances in CM for Debug
+        distS = Math.sqrt(Math.pow(sternAttachX - anchorX, 2) + Math.pow(sternAttachY - seaY, 2)) / P_SCALE;
+        distF = Math.sqrt(Math.pow(bowAttachX - dockX, 2) + Math.pow(bowAttachY - dockY, 2)) / P_SCALE;
       } else {
         // --- PHYSICS UPDATE ---
-        // --- PHYSICS UPDATE ---
-        // 1. Mass Calculation (Approx 1000kg for 5m boat, scaling partly cubic/quadratic)
-        // Simplified: 800kg + (Length - 300) * 4
-        // 3m -> 800kg. 5m -> 1600kg. 10m -> 3600kg.
         const mass = 800 + (r.boatLengthCm - 300) * 4;
 
-        // 2. Wind Force (Standard Physics: F = 0.5 * rho * A * v^2)
-        // Projected Area approx 2.0 m2 for 5m boat. Scales linearly with length?
-        // Let's assume height grows slightly with length.
-        // A = 2.0 * (Length / 500)
+        // 2. Wind Force 
         const projectedArea = 2.0 * (r.boatLengthCm / 500); 
         const airRho = 1.225;
-        // currentWind is in m/s.
         const vWind = Math.abs(currentWind);
         const windForceMag = 0.5 * airRho * projectedArea * (vWind * vWind);
         windForce = Math.sign(currentWind) * windForceMag * WIND_FORCE_FACTOR;
         
-        // Resistance
         if (typeof r.boatVX === 'undefined' || isNaN(r.boatVX)) r.boatVX = 0;
 
-        // Force Accumulator
-        forceX = windForce; // Start with wind
+        forceX = windForce; 
         var chainForceVal = 0;
         var ropeForceVal = 0;
         
-        // 3. Water Drag (Hydrodynamic)
-        // Fd = 0.5 * rho * Cd * A * v^2
-        // A_submerged (Sideways/Keel) ~ Length * Draft (0.5m)
-        const submergedArea = (r.boatLengthCm / 100) * 0.5; // 2.5 m2 for 5m boat
+        // 3. Water Drag 
+        // Note: r.boatVX is in CM/Frame. 
+        // drag formulas usually expect m/s. But coefficients here are arbitrary/tuned.
+        // We keep physics units (CM/Frame) as is.
+        const submergedArea = (r.boatLengthCm / 100) * 0.5; 
         const waterRho = 1000;
-        const Cd_Water = 1.0; // Flat plate approx for keel/side
+        const Cd_Water = 1.0; 
         
         const vBoat = Math.abs(r.boatVX);
+        // Drag calculation unchanged
         const dragMag = 0.5 * waterRho * Cd_Water * submergedArea * (vBoat * vBoat);
-        
-        // Direction opposes velocity
         const dragForce = -Math.sign(r.boatVX) * dragMag;
-        
-        // Add linear viscous drag for very low speeds (stopping)
         const viscousDrag = -r.boatVX * 50.0;
         
         forceX += (dragForce + viscousDrag); 
 
-        // 3. Chain Drag (if moving and chain is slack)
-        // If extension is low, we assume chain is dragging on seabed -> higher friction
-        // We use the previously calculated extensionRatio or distToAnchor
-        const currentBoatXAbs = (dimensions.width / 2) + r.boatX;
-        // Use the attachment point offsets for physics calculations
+        // 3. Chain Drag 
+        const currentBoatXAbs = (dimensions.width / 2) + (r.boatX * P_SCALE);
+        
         const currentSternX = currentBoatXAbs + sternAttachOffsetX;
         const currentBowX = currentBoatXAbs + bowAttachOffsetX;
-        const maxSternReach = r.sternChainLengthCm + r.sternRopeLengthCm;
+        
+        // Screen Pixels
         const physDxS = Math.abs(currentSternX - anchorX);
-        const distToAnchor = Math.hypot(physDxS, Math.abs(seaY - (curY - deckHeightOffset)));
+        const boatElevBox = seaY - (curY - deckHeightOffset);
         
-           // sternTensionX is already declared
-           // catenaryPoints is defined in top scope
+        // Convert to CM for Physics
+        const physDxS_CM = physDxS / P_SCALE;
+        const boatElev_CM = boatElevBox / P_SCALE;
 
-           if (maxSternReach > 0) {
-               // Uses real Catenary Physics
-               // Calculate average weight per unit roughly (simplified model)
-               // chainW is ~0.5. ROPE ~0.5. 
-               // We treat the whole line as having the weight of the CHAIN for safety margin in simulation, or average.
-               // Let's use effectiveSagWeight logic from render loop here too.
-                const totStern = r.sternChainLengthCm + r.sternRopeLengthCm;
-                const chainW = calculateWeight(r.thickness); 
-                const ropeW = ROPE_WEIGHT_PER_M;
-                
-                // Dynamic Weight Calculation: 
-                // If only rope is lifted, use rope weight.
-                // If chain is lifted, average the weight of the LIFTED portion.
-                const boatElev = seaY - (curY - deckHeightOffset);
-                const linearDist = Math.sqrt(physDxS*physDxS + boatElev*boatElev);
-                let liftedChainAmount = 0;
-                
-                let w = ropeW;
-                if (linearDist > r.sternRopeLengthCm) {
-                     liftedChainAmount = Math.max(0, Math.min(r.sternChainLengthCm, linearDist - r.sternRopeLengthCm));
-                     const liftedRope = r.sternRopeLengthCm;
-                     const totalLifted = liftedChainAmount + liftedRope;
-                     w = ((liftedChainAmount * chainW) + (liftedRope * ropeW)) / totalLifted;
+        if (maxSternReach > 0) {
+            const totStern = r.sternChainLengthCm + r.sternRopeLengthCm;
+            const chainW = calculateWeight(r.thickness); 
+            const ropeW = ROPE_WEIGHT_PER_M;
+            
+            const linearDist_CM = Math.sqrt(physDxS_CM*physDxS_CM + boatElev_CM*boatElev_CM);
+            let liftedChainAmount = 0;
+            
+            let w = ropeW;
+            if (linearDist_CM > r.sternRopeLengthCm) {
+                    liftedChainAmount = Math.max(0, Math.min(r.sternChainLengthCm, linearDist_CM - r.sternRopeLengthCm));
+                    const liftedRope = r.sternRopeLengthCm;
+                    const totalLifted = liftedChainAmount + liftedRope;
+                    w = ((liftedChainAmount * chainW) + (liftedRope * ropeW)) / totalLifted;
+            } else {
+                if (r.sternRopeLengthCm <= 1) w = chainW;
+            }
+            
+            const anchorElev = 0;
+            // Use Seabed Solver to handle slack chain correctly (stops points going deeply underground)
+            const result = solveSeabedCatenary(0, boatElev_CM, physDxS_CM, anchorElev, maxSternReach);
+            
+            if (result.isStraight) {
+                const dist = Math.sqrt(physDxS_CM*physDxS_CM + boatElev_CM*boatElev_CM);
+                const angle = Math.atan2(boatElev_CM, physDxS_CM); 
+
+                // Linear Spring Model for Taut Line to prevent 1M+ Newton spikes
+                const stiffnessK = 500.0; // N per cm stretch
+                const baseTension = 1000.0; // Tension at exact length limit
+
+                let tensionForce;
+                if (dist >= maxSternReach) {
+                    const stretch = dist - maxSternReach;
+                    tensionForce = baseTension + (stretch * stiffnessK);
                 } else {
-                    // Even if < ropeLen, if there's no chain, just use rope. 
-                    // If pure chain, handle? (We assume mixed or rope first).
-                    // Actually if sternRopeLength is 0?
-                    if (r.sternRopeLengthCm <= 1) w = chainW;
+                    // Transition zone (highly stretched but not broken)
+                    const ratio = dist / maxSternReach;
+                    tensionForce = baseTension * Math.pow(ratio, 10); // Steep curve up to base
                 }
-               
-               // Solve Catenary using ELEVATION (Height above seabed)
-                const anchorElev = 0;
+                sternTensionX = tensionForce * Math.cos(angle);
+                catenaryPoints = result.drawPoints;
+            } else {
+                let H;
+                if (result.tensionX !== undefined) {
+                    // Explicit tension passed (e.g. 0 for slack chain)
+                    H = result.tensionX;
+                } else {
+                    H = Math.abs(result.a * w); 
+                }
+                sternTensionX = H;
+
+                const isChainLifted = liftedChainAmount > 5;
+                chainForceVal = isChainLifted ? sternTensionX : 0;
+                ropeForceVal = sternTensionX;
                 
-                // Solve from Boat (x=0) to Anchor (x=physDxS)
-                const result = solveCatenary(0, boatElev, physDxS, anchorElev, maxSternReach);
-               
-               if (result.isStraight) {
-                   // Taut line logic (Elastic)
-                   // ... existing logic ...
-                   const dist = Math.sqrt(physDxS*physDxS + boatElev*boatElev);
-                   const extensionRatio = Math.min(0.99, dist / maxSternReach);
-                   const tensionForce = (w * maxSternReach) * (Math.pow(extensionRatio, 2) / (1 - extensionRatio)) * 10.0;
-                   const angle = Math.atan2(boatElev, physDxS); // Angle of elevation
-                   sternTensionX = tensionForce * Math.cos(angle);
-                   
-                   catenaryPoints = result.drawPoints;
-               } else {
-                   // Catenary logic
-                   const H = Math.abs(result.a * w); 
-                   sternTensionX = H;
+                catenaryPoints = result.drawPoints;
 
-                   // Chain Force logic:
-                   // If ANY part of the chain is lifted off the seabed, it has tension
-                   // The horizontal tension H is constant throughout the suspended portion
-                   // We use a tolerance of 5cm to account for measurement errors
-                   const isChainLifted = liftedChainAmount > 5;
-                   
-                   chainForceVal = isChainLifted ? sternTensionX : 0;
-                   ropeForceVal = sternTensionX;
-                   
-                   catenaryPoints = result.drawPoints;
-
-                   if (result.a < 500) {
+                if (result.a < 500) {
                         forceX -= r.boatVX * (chainW * 5.0);
-                   }
-               }
-           }
+                }
+            }
+        }
 
-           // === ANCHOR DRAGGING LOGIC ===
-           // Store current stern tension for display
-           r.sternTensionForce = sternTensionX;
-           
-           // Check if stern tension exceeds anchor hold force
-           if (sternTensionX > ANCHOR_HOLD_FORCE && maxSternReach > 0) {
-               // Anchor is being dragged!
-               r.anchorDragged = true;
-               r.anchorRotation = Math.PI / 2; // Rotate 90 degrees when dragging
-               
-               // Calculate how much to drag anchor (move it toward boat)
-               // The excess force determines drag speed
-               const excessForce = sternTensionX - ANCHOR_HOLD_FORCE;
-               const dragSpeed = excessForce * 0.001; // Convert to cm/frame
-               
-               // Anchor moves in direction that reduces tension
-               // Since anchorCurrentX is distance from dock, decreasing it moves anchor toward dock/boat
-               r.anchorCurrentX = Math.max(100, r.anchorCurrentX - dragSpeed);
-           } else if (r.anchorDragged) {
-               // Keep anchor rotated if it has been dragged, but slowly return to normal
-               r.anchorRotation *= 0.95; // Gradually return to normal orientation
-               if (r.anchorRotation < 0.1) r.anchorRotation = 0;
-           }
-
-        // 4. Bow Tension (Simple Spring)
-        const currentBowY = curY - deckHeightOffset;
-        const physDxF = currentBowX - dockX; // Positive if boat is right of dock
-        const physDyF = currentBowY - dockY;
-        const distF_Phys = Math.sqrt(physDxF*physDxF + physDyF*physDyF);
+        // Anchor Logic
+        r.sternTensionForce = sternTensionX;
         
+        // Allow 5 seconds grace period after any mooring change before anchor can drag
+        const isSettling = (Date.now() - r.lastMooringInteraction) < 5000;
+        
+        if (sternTensionX > ANCHOR_HOLD_FORCE && maxSternReach > 0 && !isSettling) {
+            if (!r.anchorDragged) {
+                 console.log(`Anchor dragged at ${sternTensionX.toFixed(2)} Newton`);
+            }
+            r.anchorDragged = true;
+            r.anchorRotation = Math.PI / 2; 
+            
+            // Constant drag speed: 1.0 cm per second (assuming 60 fps)
+            const dragSpeed = 10 / 60.0; 
+            
+            // Update anchor position (CM)
+            r.anchorCurrentX = Math.max(100, r.anchorCurrentX - dragSpeed);
+
+            // Sync with UI State (throttled)
+            if (!r.uiSyncAnchorDragged) {
+                 r.uiSyncAnchorDragged = true;
+                 setIsAnchorDragged(true);
+            }
+            
+            // Sync drag distance
+            const dist = Math.round(Math.abs(r.anchorCurrentX - r.anchorStartPos));
+            if (Math.abs(dist - (r.lastSyncedDragDist || 0)) > 5) {
+                 r.lastSyncedDragDist = dist;
+                 setDragDistance(dist);
+            }
+        } else if (r.anchorDragged) {
+            r.anchorRotation *= 0.95; 
+            if (r.anchorRotation < 0.1) r.anchorRotation = 0;
+        }
+
+        // 4. Bow Tension
+        const currentBowY = curY - deckHeightOffset;
+        const physDxF = currentBowX - dockX; 
+        const physDyF = currentBowY - dockY;
+        const distF_Screen = Math.sqrt(physDxF*physDxF + physDyF*physDyF);
+        const distF_CM = distF_Screen / P_SCALE;
+
         if (r.bowRopeLengthCm > 0) {
-             const maxBowReach = r.bowRopeLengthCm;
-             
-             if (distF_Phys > maxBowReach) {
-                 // Over-stretched: Linear Spring (Stiff)
-                 const stretch = distF_Phys - maxBowReach;
-                 const k = 100.0; // Force per cm
-                 const baseTension = 2000.0; 
-                 // Total tension magnitude
-                 const T = baseTension + (stretch * k);
-                 
-                 // X-component
-                 const angle = Math.atan2(physDyF, physDxF); // angle from dock to boat? No, physDxF is boat-dock.
-                 // Force pulls boat towards dock.
-                 // Vector D = Dock - Boat.
-                 // DockX - CurrentBowX = -physDxF.
-                 // DockY - CurrentBowY = -physDyF.
-                 const angleToDock = Math.atan2(-physDyF, -physDxF);
-                 
-                 bowTensionX = Math.abs(T * Math.cos(angleToDock));
-                 
-                 // Apply Damping
-                 if (Math.abs(r.boatVX) > 0.01) {
-                     // Damping aligns with velocity, opposes it.
-                     const damping = r.boatVX * 150.0;
-                     // Only apply if checking direction?
-                     // Simple drag is fine.
-                     forceX -= damping;
-                 }
-             } else {
-                 bowTensionX = 0;
-             }
+                const maxBowReach = r.bowRopeLengthCm;
+                
+                if (distF_CM > maxBowReach) {
+                    const stretch = distF_CM - maxBowReach;
+                    const k = 100.0; 
+                    const baseTension = 2000.0; 
+                    const T = baseTension + (stretch * k);
+                    
+                    const angleToDock = Math.atan2(-physDyF, -physDxF);
+                    bowTensionX = Math.abs(T * Math.cos(angleToDock));
+                    
+                    if (Math.abs(r.boatVX) > 0.01) {
+                        const damping = r.boatVX * 150.0;
+                        forceX -= damping;
+                    }
+                } else {
+                    bowTensionX = 0;
+                }
         }
 
         const sternForceSign = currentSternX > anchorX ? -1 : 1;
         const bowForceSign = currentBowX < dockX ? 1 : -1;
         
-        // Apply Rope Damping
-        if (bowTensionX > 100) {
-             forceX -= (r.boatVX * 100); 
-        }
+        if (bowTensionX > 100) forceX -= (r.boatVX * 100); 
 
         forceX += (sternTensionX * sternForceSign);
         forceX += (bowTensionX * bowForceSign);
 
-        // Integration (Euler)
         const accelX = forceX / mass;
         r.boatVX += accelX * 0.05; 
         r.boatVX *= 0.98; 
         
-        // NaN Guard
-        if (isNaN(r.boatVX)) { console.warn("NaN detected in boatVX, resetting"); r.boatVX = 0; }
-        
+        if (isNaN(r.boatVX)) { r.boatVX = 0; }
         r.boatX += r.boatVX;
-        if (isNaN(r.boatX)) { console.warn("NaN detected in boatX, resetting"); r.boatX = 0; }
+        if (isNaN(r.boatX)) { r.boatX = 0; }
         
         if (Math.abs(r.boatVX) < 0.01 && Math.abs(forceX) < 1.0) r.boatVX = 0;
 
-        let tempBoatXAbs = (dimensions.width / 2) + r.boatX;
+        let tempBoatXAbs = (dimensions.width / 2) + (r.boatX * P_SCALE);
         let natY = curY + Math.sin(tempBoatXAbs * WAVE_K + r.wavePhase) * currentAmp;
         
-        // Clamping logic
+        // Clamping logic (Physics Bounds in Screen Px)
         const attachY = natY - deckHeightOffset;
         const dyF = Math.abs(attachY - dockY);
         const dyS = Math.abs(attachY - seaY);
 
         let allowedDxFront = 0;
-        if (dyF < maxFrontStretch) allowedDxFront = Math.sqrt(Math.pow(maxFrontStretch, 2) - Math.pow(dyF, 2));
+        // Convert to CM, check bound, convert back to Px
+        if (dyF / P_SCALE < maxFrontStretch) {
+            const dyF_CM = dyF / P_SCALE;
+            const allowed_CM = Math.sqrt(Math.pow(maxFrontStretch, 2) - Math.pow(dyF_CM, 2));
+            allowedDxFront = allowed_CM * P_SCALE;
+        }
         
         let allowedDxStern = 0;
-        if (dyS < maxSternStretch) allowedDxStern = Math.sqrt(Math.pow(maxSternStretch, 2) - Math.pow(dyS, 2));
+        if (dyS / P_SCALE < maxSternStretch) {
+             const dyS_CM = dyS / P_SCALE;
+             const allowed_CM = Math.sqrt(Math.pow(maxSternStretch, 2) - Math.pow(dyS_CM, 2));
+             allowedDxStern = allowed_CM * P_SCALE;
+        }
 
         const minX_Front = dockX - allowedDxFront - halfL; 
         const maxX_Front = dockX + allowedDxFront - halfL;
@@ -768,16 +894,11 @@ const App = () => {
         if (now - lastLog > 5000) {
             console.log("--- PHYSICS DEBUG ---");
             console.table({
-                BoatX: r.boatX.toFixed(1),
+                BoatX_CM: r.boatX.toFixed(1),
                 BoatVX: r.boatVX.toFixed(3),
-                WindForce: windForce.toFixed(0),
-                BowTension: bowTensionX.toFixed(0),
                 TotalForce: forceX.toFixed(0),
-                MinX_Front: minX_Front.toFixed(0),
-                CurrentX_Abs: tempBoatXAbs.toFixed(0),
-                DistF: (dockX - (tempBoatXAbs + halfL)).toFixed(1),
-                MaxFrontStretch: maxFrontStretch.toFixed(1),
-                Diff_Clamp: (tempBoatXAbs - minX_Front).toFixed(1)
+                DistF_CM: distF_CM.toFixed(1),
+                SternTension: sternTensionX.toFixed(0),
             });
             lastLog = now;
         }
@@ -795,16 +916,19 @@ const App = () => {
         }
 
         boatXAbs = tempBoatXAbs;
-        r.boatX = boatXAbs - (dimensions.width / 2);
+        // Update Physics CM Position based on Clamped Screen Position
+        r.boatX = (boatXAbs - (dimensions.width / 2)) / P_SCALE;
         
         natY = curY + Math.sin(boatXAbs * WAVE_K + r.wavePhase) * currentAmp;
-        const nextY = curY + Math.sin((boatXAbs+1) * WAVE_K + r.wavePhase) * currentAmp;
-        const waveAngle = Math.atan2(nextY - natY, 1);
+        const nextY = curY + Math.sin((boatXAbs + (1 * P_SCALE)) * WAVE_K + r.wavePhase) * currentAmp;
+        const waveAngle = Math.atan2(nextY - natY, 1 * P_SCALE);
 
         let tiltAngle = 0;
-        if (dyF > maxFrontStretch) {
-             const hangY = dockY + maxFrontStretch + deckHeightOffset; 
-             tiltAngle = Math.atan2(hangY - natY, halfL); 
+        // Check hang angle using Scaled Pixels
+        if (dyF / P_SCALE > maxFrontStretch) {
+             // Calculate hangY in Pixels
+             const hangY = dockY + ((maxFrontStretch * P_SCALE) + deckHeightOffset); 
+             tiltAngle = Math.atan2(hangY - natY, halfL); // halfL is Scaled, y diff is Scaled -> Angle correct
         }
 
         totalAngle = waveAngle + tiltAngle;
@@ -814,13 +938,12 @@ const App = () => {
         }
 
         // --- GEOMETRIC SOLVER ---
-        // Use the new attachment point offsets for rendering
         const sxLocal = sternAttachOffsetX; 
         const syLocal = sternAttachOffsetY;
         const fxLocal = bowAttachOffsetX; 
         const fyLocal = bowAttachOffsetY;
         
-        const keelOffset = r.boatLengthCm * 0.15; 
+        const keelOffset = r.boatLengthCm * 0.15 * P_SCALE; 
         const groundLimitY = seaY - keelOffset;    
         
         // Estimate bow/stern X positions for wave calculation (using offset)
@@ -834,7 +957,7 @@ const App = () => {
         if (newBowY > groundLimitY) newBowY = groundLimitY;
         
         const dxF = Math.abs(estBowX - dockX);
-        const maxRopeF = r.bowRopeLengthCm * 1.05; 
+        const maxRopeF = r.bowRopeLengthCm * 1.05 * P_SCALE; 
         if (dxF < maxRopeF) {
             const maxDyF = Math.sqrt(Math.pow(maxRopeF, 2) - Math.pow(dxF, 2));
             const ropeLimitBottom = dockY + maxDyF + deckHeightOffset; 
@@ -874,11 +997,17 @@ const App = () => {
         bowAttachY = boatFinalY + (fxLocal * sinA + fyLocal * cosA);
         
         // Recalculate Catenary for Rendering (Visual Sync)
+        // Recalculate Catenary for Rendering (Visual Sync)
         const physDxS_Render = Math.abs(sternAttachX - anchorX);
         const sternElev = seaY - sternAttachY; 
+        
+        const physDxS_CM_Render = physDxS_Render / P_SCALE;
+        const sternElev_CM = sternElev / P_SCALE;
+        
         const anchorElev = 0;
         if (maxRopeS > 0) {
-             const result = solveCatenary(0, sternElev, physDxS_Render, anchorElev, maxRopeS);
+             // Correctly use Seabed solver and CM units
+             const result = solveSeabedCatenary(0, sternElev_CM, physDxS_CM_Render, anchorElev, maxRopeS);
              catenaryPoints = result.drawPoints;
         }
 
@@ -974,16 +1103,17 @@ const App = () => {
       const foregroundLayer = [
           { id: 'water_back', draw: () => {
               const wA = 0.7; ctx.fillStyle = `rgba(14, 165, 233, ${wA})`;
+              // Use large bounds to cover any zoom level (-2000 to +4000)
               [30, -20].forEach((o, idx) => {
-                ctx.beginPath(); ctx.moveTo(0, dimensions.height);
-                for (let i = 0; i <= dimensions.width; i++) ctx.lineTo(i, curY + o + Math.sin(i * WAVE_K + r.wavePhase + idx) * (currentAmp * 0.7));
-                ctx.lineTo(dimensions.width, dimensions.height); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(-2000, dimensions.height + 1000);
+                for (let i = -2000; i <= dimensions.width + 2000; i += 5) ctx.lineTo(i, curY + o + Math.sin(i * WAVE_K + r.wavePhase + idx) * (currentAmp * 0.7));
+                ctx.lineTo(dimensions.width + 2000, dimensions.height + 1000); ctx.fill();
               });
           }},
           { id: 'seabed', draw: () => {
-              const seabedGrad = ctx.createLinearGradient(0, seaY, 0, dimensions.height);
+              const seabedGrad = ctx.createLinearGradient(0, seaY, 0, dimensions.height + 1000);
               seabedGrad.addColorStop(0, '#eab308'); seabedGrad.addColorStop(1, '#a16207');
-              ctx.fillStyle = seabedGrad; ctx.fillRect(0, seaY, dimensions.width, dimensions.height - seaY);
+              ctx.fillStyle = seabedGrad; ctx.fillRect(-2000, seaY, dimensions.width + 4000, dimensions.height + 1000);
           }},
           { id: 'anchor', draw: () => {
               ctx.save();
@@ -1004,16 +1134,29 @@ const App = () => {
           }},
           { id: 'stern_line', draw: () => {
                if (catenaryPoints && catenaryPoints.length > 1) {
-                    const sternLeft = sternAttachX < anchorX;
+                    // RECALCULATE ATTACH POINT TO ENSURE SYNC WITH RENDER
+                    const bX = (dimensions.width / 2) + (r.boatX * P_SCALE);
+                    const halfL = (r.boatLengthCm * P_SCALE) / 2;
+                    const boatH = (r.boatLengthCm * P_SCALE) * 0.25;
+                    const sOffX = -halfL * 0.85; 
+                    const sOffY = -boatH * 0.20; // Was 0.15, Sync with physics adjustment
+                    const cosA = Math.cos(r.boatAngle || 0);
+                    const sinA = Math.sin(r.boatAngle || 0);
+                    
+                    const sternX = bX + (sOffX * cosA) - (sOffY * sinA);
+                    const ancX = dockX - (r.anchorCurrentX * P_SCALE);
+                    
+                    const sternLeft = sternX < ancX;
                     const chainLen = r.sternChainLengthCm;
                     
                     // Draw Rope (Boat side)
                     ctx.beginPath(); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 3;
-                    
+
                     let drawnRope = false;
                     const getPt = (p) => {
-                         const sx = sternLeft ? (sternAttachX + p.x) : (sternAttachX - p.x);
-                         const sy = Math.min(seaY, seaY - p.y);
+                         // p is in CM, convert to Scaled Pixels
+                         const sx = sternLeft ? (sternX + (p.x * P_SCALE)) : (sternX - (p.x * P_SCALE));
+                         const sy = Math.min(seaY, seaY - (p.y * P_SCALE));
                          return {x: sx, y: sy};
                     };
 
@@ -1033,6 +1176,8 @@ const App = () => {
                          len += segLen;
                     }
                     if (drawnRope) ctx.stroke();
+
+
                     
                     // Draw Chain part (Links)
                     ctx.strokeStyle = '#334155'; ctx.lineWidth = 1.5; 
@@ -1041,10 +1186,12 @@ const App = () => {
                          const p1 = catenaryPoints[i];
                          const p2 = catenaryPoints[i+1];
                          const segLen = Math.sqrt(Math.pow(p2.x-p1.x, 2) + Math.pow(p2.y-p1.y, 2));
+                         
+                         // If this segment is part of the chain (past rope end), or overlaps it
                          if (len + segLen > r.sternRopeLengthCm) {
                               const s1 = getPt(p1);
                               const s2 = getPt(p2);
-                              const linkDist = 10; 
+                              const linkDist = 10 * P_SCALE;  // Scale link distribution distance
                               const dist = Math.hypot(s2.x - s1.x, s2.y - s1.y);
                               const steps = Math.max(1, Math.floor(dist / linkDist));
                               const angle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
@@ -1052,14 +1199,15 @@ const App = () => {
                               for(let k=0; k<steps; k++) {
                                   const t = k/steps;
                                   const currentDistOnLine = len + (segLen * t);
-                                  if (currentDistOnLine > r.sternRopeLengthCm) {
+                                  // Only draw if we are significantly past the rope (allow slight overlap)
+                                  if (currentDistOnLine > r.sternRopeLengthCm - 10) {
                                       const lx = s1.x + (s2.x - s1.x)*t;
                                       const ly = s1.y + (s2.y - s1.y)*t;
                                       
-                                      // Scale link size based on chain thickness (default 10mm)
-                                      const linkScale = r.thickness / 10;
-                                      const linkWidth = 5 * linkScale;
-                                      const linkHeight = 2.5 * linkScale;
+                                      // Scale link size based on chain thickness
+                                      const linkScale = (r.thickness / 10) * P_SCALE * 1.5; 
+                                      const linkWidth = 10 * linkScale; 
+                                      const linkHeight = 6 * linkScale;
                                       
                                       ctx.save();
                                       ctx.translate(lx, ly);
@@ -1081,7 +1229,8 @@ const App = () => {
           { id: 'bow_rope', draw: () => {
               ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bowAttachX, bowAttachY);
               const dF_draw = Math.sqrt(Math.pow(bowAttachX - dockX, 2) + Math.pow(bowAttachY - dockY, 2));
-              const slackF = Math.max(0, r.bowRopeLengthCm - dF_draw);
+              // Compare scaled draw distance with scaled rope length
+              const slackF = Math.max(0, (r.bowRopeLengthCm * P_SCALE) - dF_draw);
               if (fTaut && r.windDir === 1 && !r.isSunk) {
                 ctx.strokeStyle = fCritical ? '#ef4444' : '#f97316'; ctx.lineTo(dockX, dockY); 
               } else {
@@ -1094,20 +1243,28 @@ const App = () => {
           }},
 
           { id: 'boat', draw: () => {
-              // Visual offset: boat sits 30cm higher in water (visual only, physics unaffected)
-              drawBoat(ctx, boatXAbs, boatFinalY - 35, totalAngle, bState, currentWind, r.boatLengthCm);
+              // Visual offset
+              drawBoat(ctx, boatXAbs, boatFinalY - (BOAT_WATERLINE_CM * P_SCALE), totalAngle, bState, currentWind, r.boatLengthCm * P_SCALE);
           }},
           { id: 'water_front', draw: () => {
-              const wA = 0.5; ctx.beginPath(); ctx.moveTo(0, dimensions.height);
-              for (let i = 0; i <= dimensions.width; i++) ctx.lineTo(i, curY + Math.sin(i * WAVE_K + r.wavePhase) * currentAmp);
-              ctx.lineTo(dimensions.width, dimensions.height); ctx.fillStyle = `rgba(14, 165, 233, ${wA})`; ctx.fill();
+              // Use large bounds to cover any zoom level
+              const wA = 0.5; ctx.beginPath(); ctx.moveTo(-2000, dimensions.height + 1000);
+              for (let i = -2000; i <= dimensions.width + 2000; i += 5) ctx.lineTo(i, curY + Math.sin(i * WAVE_K + r.wavePhase) * currentAmp);
+              ctx.lineTo(dimensions.width + 2000, dimensions.height + 1000); ctx.fillStyle = `rgba(14, 165, 233, ${wA})`; ctx.fill();
           }},
           { id: 'depth_ruler', draw: () => {
-              const trans = t[r.lang] || t['sv'];
+              // Use P_SCALE for ticks
+              // Fix ruler to left edge of screen (account for zoom offset)
+              const leftEdge = -viewOffsetX;
+              
               ctx.save(); ctx.strokeStyle = 'rgba(15, 23, 42, 0.2)'; ctx.fillStyle = 'rgba(15, 23, 42, 0.7)'; ctx.font = 'bold 14px monospace';
-              for (let y = seaY; y > 0; y -= 100) { ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(25, y); ctx.stroke(); ctx.fillText(`${Math.round(seaY-y)/100}m`, 15, y+4); }
-              ctx.fillStyle = '#0ea5e9'; ctx.beginPath(); ctx.moveTo(40, curY); ctx.lineTo(32, curY - 5); ctx.lineTo(32, curY + 5); ctx.fill();
-              drawHorizontalRuler(ctx, seaY, dockX);
+              for (let y = seaY; y > 0; y -= (100 * P_SCALE)) { 
+                  ctx.beginPath(); ctx.moveTo(leftEdge + 40, y); ctx.lineTo(leftEdge + 25, y); ctx.stroke(); 
+                  const meters = Math.round((seaY-y) / P_SCALE) / 100;
+                  ctx.fillText(`${meters.toFixed(0)}m`, leftEdge + 15, y+4); 
+              }
+              ctx.fillStyle = '#0ea5e9'; ctx.beginPath(); ctx.moveTo(leftEdge + 40, curY); ctx.lineTo(leftEdge + 32, curY - 5); ctx.lineTo(leftEdge + 32, curY + 5); ctx.fill();
+              drawHorizontalRuler(ctx, seaY, dockX, P_SCALE);
               // Show anchor label in red if it has been dragged
               ctx.fillStyle = r.anchorDragged ? '#ef4444' : '#10b981'; 
               ctx.textAlign = 'center'; 
@@ -1181,41 +1338,61 @@ const App = () => {
               // Chain & Rope Forces
               ctx.fillStyle = '#1e293b'; 
               ctx.fillText(`${trans.hudRopeForce}: ${d.ropeForce?.toFixed(1) || 0} N`, 0, y); y += 15;
-              ctx.fillText(`${trans.hudChainForce}: ${d.chainForce?.toFixed(1) || 0} N`, 0, y);
+              ctx.fillText(`${trans.hudChainForce}: ${d.chainForce?.toFixed(1) || 0} N`, 0, y); y += 15;
+              
+              // Anchor Force
+              ctx.fillStyle = (d.sternTension > ANCHOR_HOLD_FORCE) ? '#ef4444' : '#1e293b';
+              ctx.fillText(`Anchor Load: ${d.sternTension?.toFixed(1) || 0} / ${ANCHOR_HOLD_FORCE} N`, 0, y);
 
               ctx.restore();
           }}
       ];
 
-      // --- EXECUTE RENDER PASSES ---
-      [...backgroundLayer, ...midLayer, ...foregroundLayer].forEach(layer => layer.draw());
+      // --- EXECUTE RENDER PASSES (excluding HUD) ---
+      const allLayers = [...backgroundLayer, ...midLayer, ...foregroundLayer];
+      const hudLayer = allLayers.find(l => l.id === 'hud');
+      allLayers.filter(l => l.id !== 'hud').forEach(layer => layer.draw());
+
+      // Restore zoom transform
+      ctx.restore();
+
+      // Draw HUD AFTER zoom restore (fixed position like title)
+      if (hudLayer) hudLayer.draw();
 
       animationFrameId = requestAnimationFrame(animate);
     };
     animate();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [dimensions, isSunk, language]);
+  }, [dimensions, isSunk, language, zoom]);
 
 // --- PROCEDURAL LANDSCAPE ---
-// --- PROCEDURAL LANDSCAPE ---
-function drawLandscape(ctx, w, seaLevel, wind, time) {
+function drawLandscape(ctx, w, seaLevel, wind, time, viewOffsetX = 0, dockX = 0) {
+    // Use large fixed bounds to ensure coverage at any zoom level
+    const startX = -1000;
+    const totalW = w + 2000;
+    
     // Rocks (Massive Granite Coast)
     ctx.fillStyle = '#94a3b8'; // Slate-400 (Granite)
     ctx.beginPath();
-    ctx.moveTo(0, seaLevel);
-    // Peaks doubled: -360 to -450px up
-    ctx.bezierCurveTo(w * 0.2, seaLevel - 400, w * 0.4, seaLevel - 300, w * 0.5, seaLevel - 360);
-    ctx.bezierCurveTo(w * 0.6, seaLevel - 440, w * 0.8, seaLevel - 240, w, seaLevel - 320);
-    ctx.lineTo(w, seaLevel);
-    ctx.lineTo(0, seaLevel);
+    ctx.moveTo(startX, seaLevel + 500); // Start below sea level
+    ctx.lineTo(startX, seaLevel - 350); // Up to mountain
+    ctx.bezierCurveTo(startX + totalW * 0.15, seaLevel - 420, startX + totalW * 0.25, seaLevel - 380, startX + totalW * 0.35, seaLevel - 400);
+    ctx.bezierCurveTo(startX + totalW * 0.45, seaLevel - 350, startX + totalW * 0.55, seaLevel - 440, startX + totalW * 0.65, seaLevel - 360);
+    ctx.bezierCurveTo(startX + totalW * 0.75, seaLevel - 300, startX + totalW * 0.85, seaLevel - 380, startX + totalW, seaLevel - 320);
+    ctx.lineTo(startX + totalW, seaLevel + 500);
+    ctx.closePath();
     ctx.fill();
 
     // Secondary Rock Layer (Darker base/Mid-ground)
     ctx.fillStyle = '#64748b'; // Slate-500
     ctx.beginPath();
-    ctx.moveTo(0, seaLevel);
-    ctx.quadraticCurveTo(w * 0.3, seaLevel - 160, w * 0.6, seaLevel - 80);
-    ctx.quadraticCurveTo(w * 0.8, seaLevel - 120, w, seaLevel);
+    ctx.moveTo(startX, seaLevel + 500);
+    ctx.lineTo(startX, seaLevel - 120);
+    ctx.quadraticCurveTo(startX + totalW * 0.2, seaLevel - 180, startX + totalW * 0.4, seaLevel - 100);
+    ctx.quadraticCurveTo(startX + totalW * 0.6, seaLevel - 140, startX + totalW * 0.8, seaLevel - 80);
+    ctx.quadraticCurveTo(startX + totalW * 0.9, seaLevel - 100, startX + totalW, seaLevel);
+    ctx.lineTo(startX + totalW, seaLevel + 500);
+    ctx.closePath();
     ctx.fill();
 
     // Boat Houses (Sjöbodar)
@@ -1266,8 +1443,10 @@ function drawLandscape(ctx, w, seaLevel, wind, time) {
     // Place Huts Higher Up on the new peaks
     
     // --- STATIC DOCK UNDER HUTS ---
-    const dockStart = w * 0.6;
-    const dockEnd = w * 1.0;
+    // Use the passed dockX to position the background dock relative to main dock
+    const mainDockEnd = dockX + 150; // Main dock extends 150px from dockX
+    const dockStart = mainDockEnd; // Hut dock starts at end of main dock
+    const dockEnd = w + 500; // Extend way to the right
     const dockY = seaLevel - 215;
     
     // 1. Pillars (Dark Wood)
@@ -1285,33 +1464,21 @@ function drawLandscape(ctx, w, seaLevel, wind, time) {
     ctx.fillStyle = '#92400e'; // lighter wood
     ctx.fillRect(dockStart, dockY - 14, dockEnd - dockStart, 4); // Top rail
     
-    // x=0.15: ~ -330
-    // x=0.15: ~ -330
+    // Huts on rocks (background)
     drawHut(w * 0.35, seaLevel - 330, 1.0);
-    
-    // x=0.55: ~ -380
     drawHut(w * 0.57, seaLevel - 330, 1.0);
     drawHut(w * 0.60, seaLevel - 320, 1.0);
     
-    // x=0.85: ~ -270
-    drawHut(w * 0.65, seaLevel - 215, 0.85);
-    drawHut(w * 0.67, seaLevel - 215, 0.85);
-    drawHut(w * 0.69, seaLevel - 215, 0.85);
-    drawHut(w * 0.71, seaLevel - 215, 0.85);
-    drawHut(w * 0.73, seaLevel - 215, 0.85);
-    drawHut(w * 0.75, seaLevel - 215, 0.85);
-    drawHut(w * 0.77, seaLevel - 215, 0.85);
-    drawHut(w * 0.79, seaLevel - 215, 0.85);
-    drawHut(w * 0.81, seaLevel - 215, 0.85);
-    drawHut(w * 0.83, seaLevel - 215, 0.85);
-    drawHut(w * 0.85, seaLevel - 215, 0.85);
-    drawHut(w * 0.87, seaLevel - 215, 0.85);
-    drawHut(w * 0.89, seaLevel - 215, 0.85);
-    drawHut(w * 0.91, seaLevel - 215, 0.85);
-    drawHut(w * 0.93, seaLevel - 215, 0.85);
-    drawHut(w * 0.95, seaLevel - 215, 0.85);
-    drawHut(w * 0.97, seaLevel - 215, 0.85);
-    drawHut(w * 0.99, seaLevel - 215, 0.85);
+    // Huts on dock - start from end of main dock, evenly spaced
+    const hutScale = 0.85;
+    const hutWidth = 60 * hutScale; // Base hut width
+    const hutSpacing = hutWidth + 8; // Add 8px gap between huts
+    
+    let hutX = mainDockEnd + 10; // Start 10px after main dock ends
+    for (let i = 0; i < 16; i++) {
+        drawHut(hutX, seaLevel - 215, hutScale);
+        hutX += hutSpacing;
+    }
     
     // --- SWEDISH FLAG ---
     const drawFlag = (fx, fy, scale) => {
@@ -1480,12 +1647,51 @@ function drawLandscape(ctx, w, seaLevel, wind, time) {
         setBowRopeLengthCm={setBowRopeLengthCm}
         boatLengthCm={boatLengthCm}
         setBoatLengthCm={setBoatLengthCm}
+      isAnchorDragged={isAnchorDragged}
+      dragDistance={dragDistance}
       />
 
       <div className="absolute top-10 left-10 pointer-events-none text-left">
         <h1 className="text-3xl font-black uppercase italic tracking-tighter leading-none border-l-4 border-sky-600 pl-4 text-sky-900">{txt.mainTitle}</h1>
         <p className="text-[9px] mt-2 pl-4 uppercase font-bold tracking-widest text-sky-700 italic opacity-80">{txt.simulatorVersion}</p>
       </div>
+
+      {/* Zoom Controls */}
+      <div className="absolute bottom-6 left-6 flex flex-col gap-2 z-20">
+        <button 
+          onClick={() => setZoom(z => Math.min(2, z + 0.1))}
+          className="w-10 h-10 bg-white/90 hover:bg-white rounded-lg shadow-lg flex items-center justify-center text-xl font-bold text-sky-800 transition-all hover:scale-105"
+        >
+          +
+        </button>
+        <div className="text-center text-xs font-bold text-sky-800 bg-white/80 rounded px-2 py-1">
+          {Math.round(zoom * 100)}%
+        </div>
+        <button 
+          onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
+          className="w-10 h-10 bg-white/90 hover:bg-white rounded-lg shadow-lg flex items-center justify-center text-xl font-bold text-sky-800 transition-all hover:scale-105"
+        >
+          −
+        </button>
+      </div>
+
+      {/* Portrait Mode Overlay for Mobile */}
+      {showRotatePrompt && (
+        <div className="absolute inset-0 bg-sky-900/95 z-50 flex flex-col items-center justify-center text-white p-8">
+          <div className="text-6xl mb-6 animate-pulse">📱↻</div>
+          <h2 className="text-2xl font-bold mb-4 text-center">
+            {language === 'sv' ? 'Rotera skärmen' : 'Rotate your screen'}
+          </h2>
+          <p className="text-center text-sky-200 max-w-sm">
+            {language === 'sv' 
+              ? 'Denna simulator fungerar bäst i landskapsläge. Vrid din enhet 90° för bästa upplevelse.'
+              : 'This simulator works best in landscape mode. Please rotate your device 90° for the best experience.'}
+          </p>
+          <div className="mt-8 text-5xl animate-bounce">
+            🔄
+          </div>
+        </div>
+      )}
 
       <canvas ref={canvasRef} width={dimensions.width} height={dimensions.height} className="block touch-none" />
     </div>

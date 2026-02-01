@@ -34,7 +34,9 @@ const SimulatorControls = ({
   bowRopeLengthCm,
   setBowRopeLengthCm,
   boatLengthCm,
-  setBoatLengthCm
+  setBoatLengthCm,
+  isAnchorDragged,
+  dragDistance
 }) => {
   const [isOpen, setIsOpen] = useState(window.innerWidth > 1400);
 
@@ -158,7 +160,7 @@ const SimulatorControls = ({
                 }} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-blue-600" disabled={isSunk} />
                 <button onClick={() => {
                      if(isSunk) return;
-                     const val = Math.min(3000, sternTotalLengthCm + 10);
+                     const val = Math.min(6000, sternTotalLengthCm + 10);
                      setSternTotalLengthCm(val);
                      const chainLen = Math.round(val * (sternChainPercent / 100));
                      setSternChainLengthCm(chainLen);
@@ -203,11 +205,17 @@ const SimulatorControls = ({
               </div>
             </div>
             <div>
-              <label className="flex justify-between mb-1 uppercase font-bold text-emerald-400">{txt.anchorPos} <span className="font-mono">{anchorPositionXCm} cm</span></label>
+              <label className={`flex justify-between mb-1 uppercase font-bold ${isAnchorDragged ? 'text-red-500 animate-pulse' : 'text-emerald-400'}`}>
+                  {isAnchorDragged ? (
+                      <>{txt.anchorDragged} <span className="font-mono">{dragDistance} cm</span></>
+                  ) : (
+                      <>{txt.anchorPos} <span className="font-mono">{anchorPositionXCm} cm</span></>
+                  )}
+              </label>
               <div className="flex items-center gap-2">
                 <button onClick={() => !isSunk && setAnchorPositionXCm(Math.max(0, anchorPositionXCm - 10))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-emerald-400 font-bold disabled:opacity-50" disabled={isSunk}>-</button>
-                <input type="range" min="0" max="2000" value={anchorPositionXCm} onChange={(e) => setAnchorPositionXCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} />
-                <button onClick={() => !isSunk && setAnchorPositionXCm(Math.min(2000, anchorPositionXCm + 10))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-emerald-400 font-bold disabled:opacity-50" disabled={isSunk}>+</button>
+                <input type="range" min="0" max="6000" value={anchorPositionXCm} onChange={(e) => setAnchorPositionXCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-emerald-500" disabled={isSunk} />
+                <button onClick={() => !isSunk && setAnchorPositionXCm(Math.min(6000, anchorPositionXCm + 10))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-emerald-400 font-bold disabled:opacity-50" disabled={isSunk}>+</button>
               </div>
             </div>
           </div>
@@ -216,8 +224,8 @@ const SimulatorControls = ({
             <label className="flex justify-between mb-1 uppercase font-bold text-amber-400">{txt.bowLine} <span className="font-mono">{bowRopeLengthCm} cm</span></label>
             <div className="flex items-center gap-2">
               <button onClick={() => !isSunk && setBowRopeLengthCm(Math.max(10, bowRopeLengthCm - 5))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-amber-400 font-bold disabled:opacity-50" disabled={isSunk}>-</button>
-              <input type="range" min="10" max="200" value={bowRopeLengthCm} onChange={(e) => setBowRopeLengthCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-amber-400" disabled={isSunk} />
-              <button onClick={() => !isSunk && setBowRopeLengthCm(Math.min(200, bowRopeLengthCm + 5))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-amber-400 font-bold disabled:opacity-50" disabled={isSunk}>+</button>
+              <input type="range" min="10" max="500" value={bowRopeLengthCm} onChange={(e) => setBowRopeLengthCm(parseInt(e.target.value))} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none accent-amber-400" disabled={isSunk} />
+              <button onClick={() => !isSunk && setBowRopeLengthCm(Math.min(500, bowRopeLengthCm + 5))} className="w-6 h-6 bg-slate-700 rounded hover:bg-slate-600 text-amber-400 font-bold disabled:opacity-50" disabled={isSunk}>+</button>
             </div>
           </div>
 
